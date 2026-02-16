@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Ben Bilmem Eşim Bilir - Oyuncu</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="player-view">
+    <div class="player-container">
+        <!-- Join Screen -->
+        <div id="joinScreen" class="screen active">
+            <div class="join-content">
+                <div class="logo">🎮</div>
+                <h1>Oyuna Katıl</h1>
+                <input type="text" id="playerNameInput" placeholder="Adınızı girin" maxlength="20">
+                <button id="joinBtn" class="btn btn-primary">Katıl</button>
+                <p class="status-message" id="joinStatus"></p>
+            </div>
+        </div>
+
+        <!-- Waiting Screen -->
+        <div id="waitingScreen" class="screen">
+            <div class="waiting-content">
+                <div class="spinner"></div>
+                <h2>Bağlandı!</h2>
+                <p id="waitingMessage">Oyun başlaması bekleniyor...</p>
+                <div class="player-info">
+                    <p>Adınız: <strong id="playerNameDisplay"></strong></p>
+                </div>
+                <div id="playersWaitingList" class="players-waiting-list"></div>
+                <button id="startGameBtn" class="btn btn-primary" style="display: none; margin-top: 20px;">Oyunu Başlat</button>
+            </div>
+        </div>
+
+        <!-- Player Dashboard -->
+        <div id="dashboardScreen" class="screen">
+            <header class="player-header">
+                <div class="player-info-header">
+                    <h2 id="playerNameHeader"></h2>
+                    <div class="score-display">
+                        <span class="score-label">Puan:</span>
+                        <span class="score-value" id="playerScore">0</span>
+                    </div>
+                </div>
+                <div class="player-stats-header">
+                    <span class="stat-item">S: <span id="questionsCount">0</span>/14</span>
+                    <span class="stat-item strike-display" id="strikeDisplay" style="display: none;">
+                        ⚠️ Uyarı: <span id="strikeCount">0</span>/3
+                    </span>
+                </div>
+            </header>
+
+            <!-- Turn Status -->
+            <div class="turn-status" id="turnStatus">
+                <p class="turn-message" id="turnMessage">Sıranızı bekleyin...</p>
+            </div>
+
+            <!-- Question Display (visible to everyone during question) -->
+            <div class="question-display" id="questionDisplay" style="display: none;">
+                <div class="question-header">
+                    <span class="question-category" id="questionCategory"></span>
+                    <span class="question-difficulty" id="questionDifficulty"></span>
+                    <span class="question-points" id="questionPoints"></span>
+                </div>
+                <div class="question-timer" id="questionTimer">20</div>
+                <h2 class="question-text" id="questionText"></h2>
+            </div>
+
+            <!-- Player List (visible to everyone) -->
+            <div class="players-list-panel" id="playersListPanel" style="display: none;">
+                <h3>Oyuncular</h3>
+                <div id="playersListContainer"></div>
+            </div>
+
+            <!-- Jokers Panel -->
+            <div class="jokers-panel" id="jokersPanel">
+                <h3>Güçlendirmeler</h3>
+                <div class="jokers-grid">
+                    <button class="joker-btn" id="jokerDouble" data-joker="double">
+                        <div class="joker-icon">×2</div>
+                        <div class="joker-name">Çift Bela</div>
+                        <div class="joker-desc">Sorudan ÖNCE kullan</div>
+                    </button>
+                    <button class="joker-btn" id="jokerExtraTime" data-joker="extraTime">
+                        <div class="joker-icon">⏱️</div>
+                        <div class="joker-name">Ekstra Süre</div>
+                        <div class="joker-desc">2x süre uzatır</div>
+                    </button>
+                    <button class="joker-btn" id="jokerPointTheft" data-joker="pointTheft">
+                        <div class="joker-icon">🎭</div>
+                        <div class="joker-name">Puan Hırsızlığı</div>
+                        <div class="joker-desc">Rakip puanını çal</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Category Selection (only visible on player's turn) -->
+            <div class="category-selection" id="categorySelection" style="display: none;">
+                <h3>Kategori ve Zorluk Seçin</h3>
+                <div id="categoriesContainer"></div>
+            </div>
+
+            <!-- Answer Buttons (visible during question) -->
+            <div class="answer-buttons" id="answerButtons" style="display: none;">
+                <h3>Cevabınızı Seçin</h3>
+                <div class="options-grid">
+                    <button class="answer-btn" data-answer="A">A</button>
+                    <button class="answer-btn" data-answer="B">B</button>
+                    <button class="answer-btn" data-answer="C">C</button>
+                    <button class="answer-btn" data-answer="D">D</button>
+                </div>
+            </div>
+
+            <!-- Buzzer (visible during steal phase) -->
+            <div class="buzzer-container" id="buzzerContainer" style="display: none;">
+                <button id="buzzerBtn" class="buzzer-btn">
+                    <div class="buzzer-icon">🔔</div>
+                    <div class="buzzer-text">BAS!</div>
+                </button>
+                <p class="buzzer-hint">İlk basan kazanır!</p>
+            </div>
+
+            <!-- Notifications -->
+            <div id="playerNotification" class="player-notification"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let playerId = null;
+        let playerName = null;
+        let isMyTurn = false;
+        
+        // Track which category-difficulty combinations have been used
+        let usedCategoryDifficulty = {};
+
+        const CATEGORIES = [
+            { name: 'Sanat', icon: '🎨' },
+            { name: 'Coğrafya', icon: '🌍' },
+            { name: 'Genel Kültür', icon: '💡' },
+            { name: 'Tarih', icon: '📜' },
+            { name: 'Bilim', icon: '🔬' },
+            { name: 'Spor', icon: '⚽' },
+            { name: 'Mantık', icon: '🧩' }
+        ];
+
+        // Join Game
+        document.getElementById('joinBtn').addEventListener('click', () => {
+            const nameInput = document.getElementById('playerNameInput');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                showStatus('Lütfen adınızı girin', 'error');
+                return;
+            }
+            
+            playerName = name;
+            socket.emit('joinAsPlayer', { playerName: name });
+        });
+
+        // Enter key to join
+        document.getElementById('playerNameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('joinBtn').click();
+            }
+        });
+
+        // Join Success
+        socket.on('joinSuccess', (data) => {
+            playerId = data.playerId;
+            document.getElementById('playerNameDisplay').textContent = data.playerName;
+            document.getElementById('playerNameHeader').textContent = data.playerName;
+            showScreen('waitingScreen');
+        });
+
+        // Join Rejected
+        socket.on('joinRejected', (data) => {
+            showStatus(data.message, 'error');
+        });
+
+        // Game Started
+        socket.on('gameStarted', (data) => {
+            showScreen('dashboardScreen');
+            updatePlayerData(data.players);
+            
+            if (data.currentPlayerId === playerId) {
+                enableTurn();
+            }
+        });
+
+        // New Turn
+        socket.on('newTurn', (data) => {
+            updatePlayerData(data.players);
+            
+            if (data.currentPlayerId === playerId) {
+                enableTurn();
+            } else {
+                disableTurn();
+                document.getElementById('turnMessage').textContent = `${data.currentPlayerName} sırada`;
+            }
+        });
+
+        // Your Turn
+        socket.on('yourTurn', (data) => {
+            enableTurn();
+            showNotification('Sıra sizde! Kategori ve zorluk seçin.', 'success');
+            updateJokers(data.availableJokers);
+        });
+
+        // Question Selected
+        socket.on('questionSelected', (data) => {
+            // Mark this category-difficulty as used
+            const key = `${data.category}_${data.difficulty}`;
+            usedCategoryDifficulty[key] = true;
+            
+            document.getElementById('categorySelection').style.display = 'none';
+            
+            // Show question to everyone
+            document.getElementById('questionDisplay').style.display = 'block';
+            document.getElementById('questionCategory').textContent = data.category;
+            document.getElementById('questionDifficulty').textContent = data.difficulty === 'easy' ? 'KOLAY' : data.difficulty === 'medium' ? 'ORTA' : 'ZOR';
+            document.getElementById('questionPoints').textContent = data.points + (data.doubleActive ? ' x2' : '') + ' puan';
+            document.getElementById('questionText').textContent = data.question.text;
+            document.getElementById('questionTimer').textContent = data.timer;
+            
+            // Display answer options
+            const optionsGrid = document.getElementById('optionsGrid');
+            optionsGrid.innerHTML = '';
+            const optionLetters = ['A', 'B', 'C', 'D'];
+            data.question.options.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'answer-btn';
+                btn.dataset.answer = optionLetters[index];
+                btn.innerHTML = `<strong>${optionLetters[index]}</strong><br>${option}`;
+                
+                // Only enable if it's my turn
+                if (!isMyTurn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                }
+                
+                optionsGrid.appendChild(btn);
+            });
+            
+            if (isMyTurn) {
+                document.getElementById('answerButtons').style.display = 'block';
+                showNotification('Soruyu cevaplayın!', 'info');
+            } else {
+                document.getElementById('answerButtons').style.display = 'block';
+                showNotification('Soru oyunda - çalma fırsatını bekleyin', 'info');
+            }
+        });
+
+        // Enable Buzzer (steal phase)
+        socket.on('enableBuzzer', (data) => {
+            if (!isMyTurn) {
+                document.getElementById('buzzerContainer').style.display = 'flex';
+                showNotification('Çabuk! Çalmak için bas!', 'warning');
+            }
+        });
+
+        // Timer Update
+        socket.on('timerUpdate', (data) => {
+            document.getElementById('questionTimer').textContent = data.timeLeft;
+        });
+
+        // Buzz Winner
+        socket.on('buzzWinner', (data) => {
+            document.getElementById('buzzerContainer').style.display = 'none';
+        });
+
+        // Enable Answering (after buzzing)
+        socket.on('enableAnswering', (data) => {
+            document.getElementById('answerButtons').style.display = 'block';
+            showNotification('İlk sen bastın! Şimdi cevapla!', 'success');
+        });
+
+        // Answer Result
+        socket.on('answerResult', (data) => {
+            document.getElementById('answerButtons').style.display = 'none';
+            document.getElementById('buzzerContainer').style.display = 'none';
+            
+            if (data.playerId === playerId) {
+                if (data.correct) {
+                    showNotification(`✓ Doğru! +${data.points} puan`, 'success');
+                } else {
+                    showNotification('✗ Yanlış', 'error');
+                    if (data.strikes) {
+                        showNotification(`⚠️ Uyarı ${data.strikes}/3`, 'warning');
+                    }
+                }
+            }
+        });
+
+        // Joker Used
+        socket.on('jokerUsed', (data) => {
+            if (data.playerId === playerId) {
+                const jokerMap = {
+                    'Double Trouble': 'double',
+                    'Extra Time': 'extraTime',
+                    'Point Theft': 'pointTheft'
+                };
+                const jokerType = jokerMap[data.jokerType];
+                const jokerBtn = document.querySelector(`[data-joker="${jokerType}"]`);
+                if (jokerBtn) {
+                    jokerBtn.disabled = true;
+                    jokerBtn.classList.add('used');
+                }
+            }
+        });
+
+        // Point Theft
+        socket.on('pointTheftUsed', (data) => {
+            if (data.thiefId === playerId || data.victimId === playerId) {
+                showNotification(
+                    data.thiefId === playerId 
+                        ? `🎭 ${data.stolenPoints} puan çaldınız!` 
+                        : `🎭 ${data.thiefName} ${data.stolenPoints} puanınızı çaldı!`,
+                    'special'
+                );
+            }
+        });
+
+        // Strike Penalty
+        socket.on('strikePenalty', (data) => {
+            if (data.playerId === playerId) {
+                showNotification(`⚠️ 3 Uyarı! -${data.penalty} puan cezası`, 'error');
+            }
+        });
+
+        // Game Ended
+        socket.on('gameEnded', (data) => {
+            if (data.winner.id === playerId) {
+                showNotification('🏆 KAZANDINIZ! 🏆', 'success');
+            } else {
+                showNotification(`Oyun Bitti! Kazanan: ${data.winner.name}`, 'info');
+            }
+        });
+
+        // Player List Update
+        socket.on('playerListUpdate', (data) => {
+            updatePlayerData(data.players);
+            
+            // Show start button if 2+ players and game not started
+            if (data.totalPlayers >= 2 && !gameState.gameStarted) {
+                document.getElementById('startGameBtn').style.display = 'block';
+            }
+            
+            // Update waiting list
+            const waitingList = document.getElementById('playersWaitingList');
+            if (waitingList) {
+                waitingList.innerHTML = '<h4>Bağlı Oyuncular:</h4>' + 
+                    data.players.map(p => `<p>• ${p.name}</p>`).join('');
+            }
+        });
+
+        // Error
+        socket.on('error', (data) => {
+            showNotification(data.message, 'error');
+        });
+
+        // Start Game Button
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            socket.emit('startGame');
+            document.getElementById('startGameBtn').disabled = true;
+            document.getElementById('startGameBtn').textContent = 'Başlatılıyor...';
+        });
+
+        // Answer Buttons
+        document.getElementById('answerButtons').addEventListener('click', (e) => {
+            const answerBtn = e.target.closest('.answer-btn');
+            if (!answerBtn) return;
+            
+            const answer = answerBtn.dataset.answer;
+            socket.emit('submitAnswer', { answer });
+            
+            // Disable buttons after submitting
+            document.querySelectorAll('.answer-btn').forEach(btn => btn.disabled = true);
+        });
+
+        // Buzzer
+        document.getElementById('buzzerBtn').addEventListener('click', () => {
+            socket.emit('buzzIn');
+            document.getElementById('buzzerBtn').disabled = true;
+        });
+
+        // Joker Buttons
+        document.querySelectorAll('.joker-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const jokerType = btn.dataset.joker;
+                
+                if (jokerType === 'pointTheft') {
+                    socket.emit('usePointTheft');
+                } else {
+                    socket.emit('useJoker', { jokerType });
+                }
+            });
+        });
+
+        // Helper Functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('joinStatus');
+            status.textContent = message;
+            status.className = `status-message ${type}`;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('playerNotification');
+            notification.textContent = message;
+            notification.className = `player-notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function enableTurn() {
+            isMyTurn = true;
+            document.getElementById('turnStatus').classList.add('your-turn');
+            document.getElementById('turnMessage').innerHTML = '<strong>SIRA SİZDE!</strong> Kategori ve zorluk seçin';
+            document.getElementById('categorySelection').style.display = 'block';
+            document.getElementById('jokersPanel').style.display = 'block';
+            
+            // Rebuild category selection with current state
+            buildCategorySelection();
+        }
+
+        function disableTurn() {
+            isMyTurn = false;
+            document.getElementById('turnStatus').classList.remove('your-turn');
+            document.getElementById('categorySelection').style.display = 'none';
+            document.getElementById('answerButtons').style.display = 'none';
+            document.getElementById('buzzerContainer').style.display = 'none';
+            
+            // Re-enable answer buttons for next time
+            document.querySelectorAll('.answer-btn').forEach(btn => btn.disabled = false);
+            document.getElementById('buzzerBtn').disabled = false;
+        }
+
+        function buildCategorySelection() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+            
+            CATEGORIES.forEach(category => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category-group';
+                
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = 'category-header';
+                categoryHeader.innerHTML = `
+                    <span class="category-icon">${category.icon}</span>
+                    <span class="category-name">${category.name}</span>
+                `;
+                
+                const difficultyButtons = document.createElement('div');
+difficultyButtons.className = 'difficulty-buttons';
+                
+                // Create difficulty buttons
+                ['easy', 'medium', 'hard'].forEach(difficulty => {
+                    const key = `${category.name}_${difficulty}`;
+                    const isUsed = usedCategoryDifficulty[key];
+                    
+                    const diffNames = { easy: 'KOLAY', medium: 'ORTA', hard: 'ZOR' };
+                    const diffPoints = { easy: '10', medium: '20', hard: '30' };
+                    const diffTime = { easy: '10sn', medium: '15sn', hard: '20sn' };
+                    
+                    const btn = document.createElement('button');
+                    btn.className = `difficulty-btn-mini ${difficulty} ${isUsed ? 'used-difficulty' : ''}`;
+                    btn.disabled = isUsed;
+                    btn.innerHTML = `
+                        <div class="diff-name">${diffNames[difficulty]}</div>
+                        <div class="diff-info">${diffTime[difficulty]} • ${diffPoints[difficulty]}p</div>
+                    `;
+                    
+                    if (!isUsed) {
+                        btn.addEventListener('click', () => {
+                            socket.emit('selectQuestion', { 
+                                category: category.name, 
+                                difficulty: difficulty 
+                            });
+                        });
+                    }
+                    
+                    difficultyButtons.appendChild(btn);
+                });
+                
+                categoryDiv.appendChild(categoryHeader);
+                categoryDiv.appendChild(difficultyButtons);
+                container.appendChild(categoryDiv);
+            });
+        }
+
+        function updatePlayerData(players) {
+            const myData = players.find(p => p.id === playerId);
+            if (!myData) return;
+            
+            document.getElementById('playerScore').textContent = myData.score;
+            document.getElementById('questionsCount').textContent = myData.questionsAsMainPlayer;
+            
+            // Update strikes
+            if (myData.strikes > 0) {
+                document.getElementById('strikeDisplay').style.display = 'inline-block';
+                document.getElementById('strikeCount').textContent = myData.strikes;
+            } else {
+                document.getElementById('strikeDisplay').style.display = 'none';
+            }
+            
+            updateJokers(myData.jokers);
+            
+            // Update players list for everyone
+            const playersListContainer = document.getElementById('playersListContainer');
+            if (playersListContainer) {
+                playersListContainer.innerHTML = players
+                    .sort((a, b) => b.score - a.score)
+                    .map(p => `
+                        <div class="player-card ${p.isActive ? 'active-player' : ''} ${p.id === playerId ? 'my-player' : ''}">
+                            <span class="player-name">${p.name}</span>
+                            <span class="player-score">${p.score} puan</span>
+                        </div>
+                    `).join('');
+                
+                document.getElementById('playersListPanel').style.display = 'block';
+            }
+        }
+
+        function updateJokers(jokers) {
+            Object.keys(jokers).forEach(jokerType => {
+                const jokerBtn = document.querySelector(`[data-joker="${jokerType}"]`);
+                if (jokerBtn) {
+                    if (!jokers[jokerType]) {
+                        jokerBtn.disabled = true;
+                        jokerBtn.classList.add('used');
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
