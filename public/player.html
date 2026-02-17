@@ -72,6 +72,26 @@
                 <h2 class="question-text" id="questionText"></h2>
             </div>
 
+            <!-- Answer Buttons (visible during question) -->
+            <div class="answer-buttons" id="answerButtons" style="display: none;">
+                <h3>Cevabınızı Seçin</h3>
+                <div class="options-grid" id="optionsGrid">
+                    <button class="answer-btn" data-answer="A">A</button>
+                    <button class="answer-btn" data-answer="B">B</button>
+                    <button class="answer-btn" data-answer="C">C</button>
+                    <button class="answer-btn" data-answer="D">D</button>
+                </div>
+            </div>
+
+            <!-- Buzzer (visible during steal phase) -->
+            <div class="buzzer-container" id="buzzerContainer" style="display: none;">
+                <button id="buzzerBtn" class="buzzer-btn">
+                    <div class="buzzer-icon">🔔</div>
+                    <div class="buzzer-text">BAS!</div>
+                </button>
+                <p class="buzzer-hint">İlk basan kazanır!</p>
+            </div>
+
             <!-- Player List (visible to everyone) -->
             <div class="players-list-panel" id="playersListPanel" style="display: none;">
                 <h3>Oyuncular</h3>
@@ -106,25 +126,7 @@
                 <div id="categoriesContainer"></div>
             </div>
 
-            <!-- Answer Buttons (visible during question) -->
-            <div class="answer-buttons" id="answerButtons" style="display: none;">
-                <h3>Cevabınızı Seçin</h3>
-                <div class="options-grid">
-                    <button class="answer-btn" data-answer="A">A</button>
-                    <button class="answer-btn" data-answer="B">B</button>
-                    <button class="answer-btn" data-answer="C">C</button>
-                    <button class="answer-btn" data-answer="D">D</button>
-                </div>
-            </div>
 
-            <!-- Buzzer (visible during steal phase) -->
-            <div class="buzzer-container" id="buzzerContainer" style="display: none;">
-                <button id="buzzerBtn" class="buzzer-btn">
-                    <div class="buzzer-icon">🔔</div>
-                    <div class="buzzer-text">BAS!</div>
-                </button>
-                <p class="buzzer-hint">İlk basan kazanır!</p>
-            </div>
 
             <!-- Notifications -->
             <div id="playerNotification" class="player-notification"></div>
@@ -299,6 +301,7 @@
             usedCategoryDifficulty[key] = true;
 
             document.getElementById('categorySelection').style.display = 'none';
+            document.getElementById('turnMessage').textContent = 'SORU CEVAPLANIYOR...';
 
             // Show question to everyone
             document.getElementById('questionDisplay').style.display = 'block';
@@ -315,7 +318,7 @@
             data.question.options.forEach((option, index) => {
                 const btn = document.createElement('button');
                 btn.className = 'answer-btn';
-                btn.dataset.answer = optionLetters[index];
+                btn.dataset.answer = option;
                 btn.innerHTML = `<strong>${optionLetters[index]}</strong><br>${option}`;
 
                 // Only enable if it's my turn
@@ -362,6 +365,13 @@
         // Enable Answering (after buzzing)
         socket.on('enableAnswering', (data) => {
             document.getElementById('answerButtons').style.display = 'block';
+
+            // Re-enable buttons
+            document.querySelectorAll('.answer-btn').forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            });
+
             showToast('İLK SEN BASTIN! Cevapla!', 'success');
         });
 
@@ -444,7 +454,7 @@
             updatePlayerData(data.players);
 
             // Show start button if 2+ players and game not started
-            if (data.totalPlayers >= 2 && !gameState.gameStarted) {
+            if (data.totalPlayers >= 2 && !data.gameStarted) {
                 document.getElementById('startGameBtn').style.display = 'block';
             }
 

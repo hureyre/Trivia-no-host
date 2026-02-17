@@ -60,6 +60,12 @@ class GameManager {
 
         this.gameState.players[socketId] = newPlayer;
 
+        // Restore turn if player disconnected during their turn
+        if (savedSession && savedSession.isCurrentTurn) {
+            this.gameState.currentTurn = socketId;
+            // Also ensure isActive is true for this player if needed, though getPlayersData handles it via currentTurn check
+        }
+
         // Restore or initialize category attempts
         if (savedSession && savedSession.categoryAttempts) {
             this.gameState.categoryAttempts[socketId] = savedSession.categoryAttempts;
@@ -104,7 +110,8 @@ class GameManager {
             strikes: player.strikes,
             questionsAsMainPlayer: player.questionsAsMainPlayer,
             jokers: { ...player.jokers },
-            categoryAttempts: { ...this.gameState.categoryAttempts[socketId] }
+            categoryAttempts: { ...this.gameState.categoryAttempts[socketId] },
+            isCurrentTurn: socketId === this.gameState.currentTurn
         };
     }
 

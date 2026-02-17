@@ -24,7 +24,9 @@ io.on('connection', (socket) => {
   socket.on('joinAsPlayer', (data) => {
     const { playerName, token } = data;
 
-    if (gameManager.gameState.gameStarted) {
+    const isReconnection = token && gameManager.playerSessions[token];
+
+    if (gameManager.gameState.gameStarted && !isReconnection) {
       socket.emit('joinRejected', { message: 'Game already in progress!' });
       return;
     }
@@ -40,8 +42,42 @@ io.on('connection', (socket) => {
 
     io.emit('playerListUpdate', {
       players: gameManager.getPlayersData(),
-      totalPlayers: Object.keys(gameManager.gameState.players).length
+      totalPlayers: Object.keys(gameManager.gameState.players).length,
+      gameStarted: gameManager.gameState.gameStarted
     });
+
+    // If game started, sync the reconnecting player immediately
+    if (gameManager.gameState.gameStarted) {
+      socket.emit('gameStarted', {
+        message: 'Reconnected to game!',
+        currentPlayerId: gameManager.gameState.currentTurn,
+        currentPlayerName: gameManager.gameState.players[gameManager.gameState.currentTurn].name,
+        gameId: 'reconnect'
+      });
+
+      // If there is an active question, send it too
+      if (gameManager.gameState.currentQuestion) {
+        // We need a small delay to ensure the dashboard is shown first
+        setTimeout(() => {
+          socket.emit('questionSelected', {
+            question: gameManager.gameState.currentQuestion,
+            timer: gameManager.gameState.questionTimer,
+            points: DIFFICULTIES[gameManager.gameState.currentDifficulty].points,
+            doubleActive: gameManager.gameState.pendingJokers.double
+          });
+        }, 500);
+      } else {
+        // If no question, check if it's this player's turn to pick
+        if (socket.id === gameManager.gameState.currentTurn) {
+          setTimeout(() => {
+            socket.emit('yourTurn', {
+              message: 'It\'s your turn! Choose a category and difficulty.',
+              availableJokers: gameManager.gameState.players[socket.id].jokers
+            });
+          }, 500);
+        }
+      }
+    }
   });
 
   // Start Game
