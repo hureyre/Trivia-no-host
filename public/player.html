@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
+
 <body class="player-view">
     <div class="player-container">
         <!-- Join Screen -->
@@ -31,7 +33,8 @@
                     <p>Adınız: <strong id="playerNameDisplay"></strong></p>
                 </div>
                 <div id="playersWaitingList" class="players-waiting-list"></div>
-                <button id="startGameBtn" class="btn btn-primary" style="display: none; margin-top: 20px;">Oyunu Başlat</button>
+                <button id="startGameBtn" class="btn btn-primary" style="display: none; margin-top: 20px;">Oyunu
+                    Başlat</button>
             </div>
         </div>
 
@@ -126,6 +129,25 @@
             <!-- Notifications -->
             <div id="playerNotification" class="player-notification"></div>
         </div>
+        <!-- OVERLAYS -->
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Joker Overlay -->
+        <div id="jokerOverlay" class="joker-overlay">
+            <div class="joker-overlay-content">
+                <div class="joker-overlay-icon" id="jokerOverlayIcon">🃏</div>
+                <div class="joker-overlay-title" id="jokerOverlayTitle">Joker Aktif!</div>
+                <div class="joker-overlay-text" id="jokerOverlayText"></div>
+            </div>
+        </div>
+
+        <!-- Answer Feedback Overlay -->
+        <div id="feedbackOverlay" class="feedback-overlay">
+            <div class="feedback-icon" id="feedbackIcon">✓</div>
+            <div class="feedback-text" id="feedbackText">DOĞRU!</div>
+            <div class="feedback-points" id="feedbackPoints">+0 Puan</div>
+        </div>
     </div>
 
     <script>
@@ -133,7 +155,36 @@
         let playerId = null;
         let playerName = null;
         let isMyTurn = false;
-        
+
+        // Connection Status
+        socket.on('connect', () => {
+            // Create connection indicator if not exists
+            if (!document.getElementById('connectionStatus')) {
+                const status = document.createElement('div');
+                status.id = 'connectionStatus';
+                status.className = 'connection-status connected show';
+                status.innerHTML = '<div class="connection-dot"></div><span>Bağlı</span>';
+                document.body.appendChild(status);
+
+                setTimeout(() => status.classList.remove('show'), 3000);
+            } else {
+                const status = document.getElementById('connectionStatus');
+                status.className = 'connection-status connected show';
+                status.querySelector('span').textContent = 'Bağlı';
+                setTimeout(() => status.classList.remove('show'), 3000);
+            }
+        });
+
+        socket.on('disconnect', () => {
+            const status = document.getElementById('connectionStatus');
+            if (status) {
+                status.className = 'connection-status disconnected show';
+                status.querySelector('span').textContent = 'Bağlantı Koptu - Yeniden bağlanılıyor...';
+            }
+            showToast('Bağlantı koptu! Yeniden bağlanılıyor...', 'error');
+        });
+
+
         // Track which category-difficulty combinations have been used
         let usedCategoryDifficulty = {};
 
@@ -147,18 +198,33 @@
             { name: 'Mantık', icon: '🧩' }
         ];
 
+        // Check for existing session token on load
+        const storedToken = localStorage.getItem('trivia_session_token');
+        const storedName = localStorage.getItem('trivia_player_name');
+
+        // Auto-fill name if exists
+        if (storedName) {
+            document.getElementById('playerNameInput').value = storedName;
+        }
+
         // Join Game
         document.getElementById('joinBtn').addEventListener('click', () => {
             const nameInput = document.getElementById('playerNameInput');
             const name = nameInput.value.trim();
-            
+
             if (!name) {
-                showStatus('Lütfen adınızı girin', 'error');
+                showToast('Lütfen adınızı girin', 'error');
                 return;
             }
-            
+
             playerName = name;
-            socket.emit('joinAsPlayer', { playerName: name });
+            localStorage.setItem('trivia_player_name', name);
+
+            // Send token if we have one
+            socket.emit('joinAsPlayer', {
+                playerName: name,
+                token: localStorage.getItem('trivia_session_token')
+            });
         });
 
         // Enter key to join
@@ -171,13 +237,27 @@
         // Join Success
         socket.on('joinSuccess', (data) => {
             playerId = data.playerId;
+
+            // Save token for future reconnections
+            if (data.playerToken) {
+                localStorage.setItem('trivia_session_token', data.playerToken);
+            }
+
             document.getElementById('playerNameDisplay').textContent = data.playerName;
             document.getElementById('playerNameHeader').textContent = data.playerName;
             showScreen('waitingScreen');
+
+            if (data.message) {
+                document.getElementById('waitingMessage').textContent = data.message;
+                if (data.message.includes('Tekrar')) {
+                    showToast('Oturum geri yüklendi!', 'success');
+                }
+            }
         });
 
         // Join Rejected
         socket.on('joinRejected', (data) => {
+            showToast(data.message, 'error');
             showStatus(data.message, 'error');
         });
 
@@ -185,7 +265,9 @@
         socket.on('gameStarted', (data) => {
             showScreen('dashboardScreen');
             updatePlayerData(data.players);
-            
+
+            showToast('Oyun Başladı! İyi şanslar!', 'info');
+
             if (data.currentPlayerId === playerId) {
                 enableTurn();
             }
@@ -194,7 +276,7 @@
         // New Turn
         socket.on('newTurn', (data) => {
             updatePlayerData(data.players);
-            
+
             if (data.currentPlayerId === playerId) {
                 enableTurn();
             } else {
@@ -206,7 +288,7 @@
         // Your Turn
         socket.on('yourTurn', (data) => {
             enableTurn();
-            showNotification('Sıra sizde! Kategori ve zorluk seçin.', 'success');
+            showToast('Sıra sizde! Kategori seçin.', 'success');
             updateJokers(data.availableJokers);
         });
 
@@ -215,9 +297,9 @@
             // Mark this category-difficulty as used
             const key = `${data.category}_${data.difficulty}`;
             usedCategoryDifficulty[key] = true;
-            
+
             document.getElementById('categorySelection').style.display = 'none';
-            
+
             // Show question to everyone
             document.getElementById('questionDisplay').style.display = 'block';
             document.getElementById('questionCategory').textContent = data.category;
@@ -225,7 +307,7 @@
             document.getElementById('questionPoints').textContent = data.points + (data.doubleActive ? ' x2' : '') + ' puan';
             document.getElementById('questionText').textContent = data.question.text;
             document.getElementById('questionTimer').textContent = data.timer;
-            
+
             // Display answer options
             const optionsGrid = document.getElementById('optionsGrid');
             optionsGrid.innerHTML = '';
@@ -235,22 +317,22 @@
                 btn.className = 'answer-btn';
                 btn.dataset.answer = optionLetters[index];
                 btn.innerHTML = `<strong>${optionLetters[index]}</strong><br>${option}`;
-                
+
                 // Only enable if it's my turn
                 if (!isMyTurn) {
                     btn.disabled = true;
                     btn.style.opacity = '0.6';
                 }
-                
+
                 optionsGrid.appendChild(btn);
             });
-            
+
             if (isMyTurn) {
                 document.getElementById('answerButtons').style.display = 'block';
-                showNotification('Soruyu cevaplayın!', 'info');
+                showToast('Hemen cevaplayın!', 'info');
             } else {
                 document.getElementById('answerButtons').style.display = 'block';
-                showNotification('Soru oyunda - çalma fırsatını bekleyin', 'info');
+                showToast('Soru oyunda! Çalma fırsatını bekle.', 'info');
             }
         });
 
@@ -258,13 +340,18 @@
         socket.on('enableBuzzer', (data) => {
             if (!isMyTurn) {
                 document.getElementById('buzzerContainer').style.display = 'flex';
-                showNotification('Çabuk! Çalmak için bas!', 'warning');
+                showToast('ÇALMA FIRSATI! Butona bas!', 'warning');
             }
         });
 
         // Timer Update
         socket.on('timerUpdate', (data) => {
             document.getElementById('questionTimer').textContent = data.timeLeft;
+            if (data.timeLeft <= 5) {
+                document.getElementById('questionTimer').style.color = 'var(--accent-warning)';
+            } else {
+                document.getElementById('questionTimer').style.color = '';
+            }
         });
 
         // Buzz Winner
@@ -275,28 +362,34 @@
         // Enable Answering (after buzzing)
         socket.on('enableAnswering', (data) => {
             document.getElementById('answerButtons').style.display = 'block';
-            showNotification('İlk sen bastın! Şimdi cevapla!', 'success');
+            showToast('İLK SEN BASTIN! Cevapla!', 'success');
         });
 
         // Answer Result
         socket.on('answerResult', (data) => {
             document.getElementById('answerButtons').style.display = 'none';
             document.getElementById('buzzerContainer').style.display = 'none';
-            
+
             if (data.playerId === playerId) {
                 if (data.correct) {
-                    showNotification(`✓ Doğru! +${data.points} puan`, 'success');
+                    showFeedbackOverlay(true, 'DOĞRU!', `+${data.points} Puan`);
                 } else {
-                    showNotification('✗ Yanlış', 'error');
-                    if (data.strikes) {
-                        showNotification(`⚠️ Uyarı ${data.strikes}/3`, 'warning');
-                    }
+                    showFeedbackOverlay(false, 'YANLIŞ!', data.strikes ? `Uyarı ${data.strikes}/3` : '');
                 }
             }
         });
 
         // Joker Used
         socket.on('jokerUsed', (data) => {
+            // Show overlay to everyone
+            const jokerTitles = {
+                'Double Trouble': 'Çift Bela',
+                'Extra Time': 'Ekstra Süre',
+                'Point Theft': 'Puan Hırsızlığı'
+            };
+
+            showJokerOverlay(jokerTitles[data.jokerType] || data.jokerType, data.message);
+
             if (data.playerId === playerId) {
                 const jokerMap = {
                     'Double Trouble': 'double',
@@ -314,12 +407,15 @@
 
         // Point Theft
         socket.on('pointTheftUsed', (data) => {
+            // Show specialized overlay
+            showJokerOverlay('Puan Hırsızlığı!', `${data.thiefName}, ${data.victimName}'den ${data.stolenPoints} puan çaldı!`, '🎭');
+
             if (data.thiefId === playerId || data.victimId === playerId) {
-                showNotification(
-                    data.thiefId === playerId 
-                        ? `🎭 ${data.stolenPoints} puan çaldınız!` 
-                        : `🎭 ${data.thiefName} ${data.stolenPoints} puanınızı çaldı!`,
-                    'special'
+                showToast(
+                    data.thiefId === playerId
+                        ? `Başarılı! ${data.stolenPoints} puan çaldın!`
+                        : `Dikkat! ${data.stolenPoints} puanın çalındı!`,
+                    data.thiefId === playerId ? 'success' : 'error'
                 );
             }
         });
@@ -327,39 +423,42 @@
         // Strike Penalty
         socket.on('strikePenalty', (data) => {
             if (data.playerId === playerId) {
-                showNotification(`⚠️ 3 Uyarı! -${data.penalty} puan cezası`, 'error');
+                showFeedbackOverlay(false, 'CEZA PUANI!', `-${data.penalty} Puan`);
+                showToast('3 Uyarı Kotası Doldu! Puan silindi.', 'error');
             }
         });
 
         // Game Ended
         socket.on('gameEnded', (data) => {
             if (data.winner.id === playerId) {
-                showNotification('🏆 KAZANDINIZ! 🏆', 'success');
+                showToast('🏆 TEBRİKLER! KAZANDINIZ!', 'special');
+                showJokerOverlay('ŞAMPİYON!', 'Tebrikler, oyunu kazandınız!', '🏆');
             } else {
-                showNotification(`Oyun Bitti! Kazanan: ${data.winner.name}`, 'info');
+                showToast(`Oyun Bitti. Kazanan: ${data.winner.name}`, 'info');
+                showJokerOverlay('OYUN BİTTİ', `Kazanan: ${data.winner.name}`, '🏁');
             }
         });
 
         // Player List Update
         socket.on('playerListUpdate', (data) => {
             updatePlayerData(data.players);
-            
+
             // Show start button if 2+ players and game not started
             if (data.totalPlayers >= 2 && !gameState.gameStarted) {
                 document.getElementById('startGameBtn').style.display = 'block';
             }
-            
+
             // Update waiting list
             const waitingList = document.getElementById('playersWaitingList');
             if (waitingList) {
-                waitingList.innerHTML = '<h4>Bağlı Oyuncular:</h4>' + 
+                waitingList.innerHTML = '<h4>Bağlı Oyuncular:</h4>' +
                     data.players.map(p => `<p>• ${p.name}</p>`).join('');
             }
         });
 
         // Error
         socket.on('error', (data) => {
-            showNotification(data.message, 'error');
+            showToast(data.message, 'error');
         });
 
         // Start Game Button
@@ -373,10 +472,10 @@
         document.getElementById('answerButtons').addEventListener('click', (e) => {
             const answerBtn = e.target.closest('.answer-btn');
             if (!answerBtn) return;
-            
+
             const answer = answerBtn.dataset.answer;
             socket.emit('submitAnswer', { answer });
-            
+
             // Disable buttons after submitting
             document.querySelectorAll('.answer-btn').forEach(btn => btn.disabled = true);
         });
@@ -391,7 +490,7 @@
         document.querySelectorAll('.joker-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const jokerType = btn.dataset.joker;
-                
+
                 if (jokerType === 'pointTheft') {
                     socket.emit('usePointTheft');
                 } else {
@@ -414,14 +513,74 @@
             status.className = `status-message ${type}`;
         }
 
-        function showNotification(message, type = 'info') {
-            const notification = document.getElementById('playerNotification');
-            notification.textContent = message;
-            notification.className = `player-notification ${type} show`;
-            
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            let icon = 'ℹ️';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+            if (type === 'warning') icon = '⚠️';
+            if (type === 'special') icon = '✨';
+
+            toast.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-message">${message}</div>
+            `;
+
+            container.appendChild(toast);
+
+            // Reflow
+            toast.offsetHeight;
+            toast.classList.add('show');
+
             setTimeout(() => {
-                notification.classList.remove('show');
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 400);
             }, 3000);
+        }
+
+        function showJokerOverlay(title, text, customIcon = null) {
+            const overlay = document.getElementById('jokerOverlay');
+            document.getElementById('jokerOverlayTitle').textContent = title;
+            document.getElementById('jokerOverlayText').textContent = text;
+            if (customIcon) {
+                document.getElementById('jokerOverlayIcon').textContent = customIcon;
+            } else {
+                document.getElementById('jokerOverlayIcon').textContent = '🃏';
+            }
+
+            overlay.classList.add('active');
+
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 2500);
+        }
+
+        function showFeedbackOverlay(isCorrect, text, pointsText) {
+            const overlay = document.getElementById('feedbackOverlay');
+            const icon = document.getElementById('feedbackIcon');
+            const mainText = document.getElementById('feedbackText');
+            const subText = document.getElementById('feedbackPoints');
+
+            overlay.className = `feedback-overlay ${isCorrect ? 'correct' : 'wrong'}`;
+            icon.textContent = isCorrect ? '✓' : '✗';
+            mainText.textContent = text;
+            subText.textContent = pointsText;
+
+            overlay.classList.add('show');
+
+            setTimeout(() => {
+                overlay.classList.remove('show');
+            }, 1500);
+        }
+
+        // Deprecated but kept for compatibility just in case
+        function showNotification(message, type = 'info') {
+            showToast(message, type);
         }
 
         function enableTurn() {
@@ -430,7 +589,7 @@
             document.getElementById('turnMessage').innerHTML = '<strong>SIRA SİZDE!</strong> Kategori ve zorluk seçin';
             document.getElementById('categorySelection').style.display = 'block';
             document.getElementById('jokersPanel').style.display = 'block';
-            
+
             // Rebuild category selection with current state
             buildCategorySelection();
         }
@@ -441,7 +600,7 @@
             document.getElementById('categorySelection').style.display = 'none';
             document.getElementById('answerButtons').style.display = 'none';
             document.getElementById('buzzerContainer').style.display = 'none';
-            
+
             // Re-enable answer buttons for next time
             document.querySelectorAll('.answer-btn').forEach(btn => btn.disabled = false);
             document.getElementById('buzzerBtn').disabled = false;
@@ -450,30 +609,30 @@
         function buildCategorySelection() {
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
-            
+
             CATEGORIES.forEach(category => {
                 const categoryDiv = document.createElement('div');
                 categoryDiv.className = 'category-group';
-                
+
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = 'category-header';
                 categoryHeader.innerHTML = `
                     <span class="category-icon">${category.icon}</span>
                     <span class="category-name">${category.name}</span>
                 `;
-                
+
                 const difficultyButtons = document.createElement('div');
-difficultyButtons.className = 'difficulty-buttons';
-                
+                difficultyButtons.className = 'difficulty-buttons';
+
                 // Create difficulty buttons
                 ['easy', 'medium', 'hard'].forEach(difficulty => {
                     const key = `${category.name}_${difficulty}`;
                     const isUsed = usedCategoryDifficulty[key];
-                    
+
                     const diffNames = { easy: 'KOLAY', medium: 'ORTA', hard: 'ZOR' };
                     const diffPoints = { easy: '10', medium: '20', hard: '30' };
                     const diffTime = { easy: '10sn', medium: '15sn', hard: '20sn' };
-                    
+
                     const btn = document.createElement('button');
                     btn.className = `difficulty-btn-mini ${difficulty} ${isUsed ? 'used-difficulty' : ''}`;
                     btn.disabled = isUsed;
@@ -481,19 +640,19 @@ difficultyButtons.className = 'difficulty-buttons';
                         <div class="diff-name">${diffNames[difficulty]}</div>
                         <div class="diff-info">${diffTime[difficulty]} • ${diffPoints[difficulty]}p</div>
                     `;
-                    
+
                     if (!isUsed) {
                         btn.addEventListener('click', () => {
-                            socket.emit('selectQuestion', { 
-                                category: category.name, 
-                                difficulty: difficulty 
+                            socket.emit('selectQuestion', {
+                                category: category.name,
+                                difficulty: difficulty
                             });
                         });
                     }
-                    
+
                     difficultyButtons.appendChild(btn);
                 });
-                
+
                 categoryDiv.appendChild(categoryHeader);
                 categoryDiv.appendChild(difficultyButtons);
                 container.appendChild(categoryDiv);
@@ -503,10 +662,10 @@ difficultyButtons.className = 'difficulty-buttons';
         function updatePlayerData(players) {
             const myData = players.find(p => p.id === playerId);
             if (!myData) return;
-            
+
             document.getElementById('playerScore').textContent = myData.score;
             document.getElementById('questionsCount').textContent = myData.questionsAsMainPlayer;
-            
+
             // Update strikes
             if (myData.strikes > 0) {
                 document.getElementById('strikeDisplay').style.display = 'inline-block';
@@ -514,9 +673,9 @@ difficultyButtons.className = 'difficulty-buttons';
             } else {
                 document.getElementById('strikeDisplay').style.display = 'none';
             }
-            
+
             updateJokers(myData.jokers);
-            
+
             // Update players list for everyone
             const playersListContainer = document.getElementById('playersListContainer');
             if (playersListContainer) {
@@ -528,7 +687,7 @@ difficultyButtons.className = 'difficulty-buttons';
                             <span class="player-score">${p.score} puan</span>
                         </div>
                     `).join('');
-                
+
                 document.getElementById('playersListPanel').style.display = 'block';
             }
         }
@@ -546,4 +705,5 @@ difficultyButtons.className = 'difficulty-buttons';
         }
     </script>
 </body>
+
 </html>

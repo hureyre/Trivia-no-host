@@ -1295,3 +1295,176 @@ button {
     font-weight: 700;
     color: var(--accent-info);
 }
+
+/* ===================================
+   VISUAL FEEDBACK & OVERLAYS
+   =================================== */
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    width: 90%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    border-left: 5px solid var(--accent-info);
+    pointer-events: auto;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.success { border-left-color: var(--accent-success); }
+.toast.error { border-left-color: var(--accent-primary); }
+.toast.warning { border-left-color: var(--accent-warning); }
+.toast.info { border-left-color: var(--accent-info); }
+.toast.special { border-left-color: #ffd700; background: linear-gradient(135deg, #2c2c54, #474787); }
+
+.toast-message { font-size: 0.95rem; font-weight: 500; }
+
+/* Joker Activation Overlay */
+.joker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(15, 15, 35, 0.9);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.joker-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.joker-overlay-content {
+    text-align: center;
+    transform: scale(0.5);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.joker-overlay.active .joker-overlay-content {
+    transform: scale(1);
+}
+
+.joker-overlay-icon {
+    font-size: 6rem;
+    margin-bottom: 20px;
+    animation: floating 2s ease-in-out infinite;
+}
+
+.joker-overlay-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px currentColor;
+}
+
+.joker-overlay-text {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+}
+
+/* Answer Feedback Overlay */
+.feedback-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    backdrop-filter: blur(5px);
+}
+
+.feedback-overlay.correct {
+    background: rgba(0, 217, 163, 0.3);
+}
+
+.feedback-overlay.wrong {
+    background: rgba(233, 69, 96, 0.3);
+}
+
+.feedback-overlay.show {
+    opacity: 1;
+}
+
+.feedback-icon {
+    font-size: 8rem;
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.feedback-text {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.4s 0.1s ease-out;
+}
+
+.feedback-overlay.show .feedback-icon {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.feedback-overlay.show .feedback-text {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.feedback-points {
+    font-size: 1.5rem;
+    color: white;
+    margin-top: 10px;
+    font-weight: 600;
+    background: rgba(0,0,0,0.3);
+    padding: 5px 15px;
+    border-radius: 20px;
+}
+
+@keyframes floating {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
