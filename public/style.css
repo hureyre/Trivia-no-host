@@ -1165,7 +1165,7 @@ button {
     border-radius: 15px;
     padding: 20px;
     margin: 20px 0;
-    border: 2px solid var(--accent-primary);
+    border: 2px solid var(--accent-info);
 }
 
 .question-header {
