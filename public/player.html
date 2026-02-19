@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -15,6 +16,7 @@
             gap: 15px;
             margin-top: 20px;
         }
+
         .room-code-display {
             font-size: 2.5em;
             font-weight: bold;
@@ -22,10 +24,11 @@
             color: var(--accent-color, #ffcd3c);
             margin: 20px 0;
             padding: 15px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             user-select: all;
         }
+
         .pass-notification {
             background-color: #ff4757;
             color: white;
@@ -35,15 +38,28 @@
             margin-bottom: 10px;
             font-weight: bold;
         }
+
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.8; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
+
         .correct-answer-modal {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -53,10 +69,12 @@
             pointer-events: none;
             transition: opacity 0.3s;
         }
+
         .correct-answer-modal.active {
             opacity: 1;
             pointer-events: all;
         }
+
         .correct-answer-content {
             background: #fff;
             color: #333;
@@ -66,32 +84,41 @@
             max-width: 90%;
             width: 400px;
         }
+
         .correct-answer-letter {
             font-size: 4em;
             font-weight: bold;
             color: #2ecc71;
             margin-bottom: 10px;
         }
+
         .correct-answer-text {
             font-size: 1.5em;
             margin-bottom: 20px;
         }
+
         .explanation-text {
             font-size: 1em;
             color: #666;
             font-style: italic;
         }
-        
+
         /* Mobile optimizations */
         @media (max-width: 600px) {
-            .room-code-display { font-size: 2em; }
-            .correct-answer-letter { font-size: 3em; }
+            .room-code-display {
+                font-size: 2em;
+            }
+
+            .correct-answer-letter {
+                font-size: 3em;
+            }
         }
     </style>
 </head>
+
 <body class="player-view">
     <div class="player-container">
-        
+
         <!-- Screen 1: Name Input -->
         <div id="nameScreen" class="screen active">
             <div class="join-content">
@@ -109,7 +136,8 @@
                 <div class="room-controls">
                     <button id="createRoomBtn" class="btn btn-secondary">Yeni Oda Kur</button>
                     <div class="divider">- VEYA -</div>
-                    <input type="text" id="roomCodeInput" placeholder="Oda Kodu (örn. ABCD)" maxlength="4" style="text-transform:uppercase;">
+                    <input type="text" id="roomCodeInput" placeholder="Oda Kodu (örn. ABCD)" maxlength="4"
+                        style="text-transform:uppercase;">
                     <button id="joinRoomBtn" class="btn btn-primary">Odaya Katıl</button>
                 </div>
                 <button id="backToNameBtn" class="btn btn-text">← Geri Dön</button>
@@ -122,13 +150,14 @@
                 <h3>Oda Kodu</h3>
                 <div id="roomCodeDisplay" class="room-code-display">----</div>
                 <p>Bekleniyor...</p>
-                
+
                 <div class="player-info">
                     <p>Oyuncular:</p>
                 </div>
                 <div id="lobbyPlayerList" class="players-waiting-list"></div>
-                
-                <button id="startGameBtn" class="btn btn-primary" style="display: none; margin-top: 20px;">Oyunu Başlat</button>
+
+                <button id="startGameBtn" class="btn btn-primary" style="display: none; margin-top: 20px;">Oyunu
+                    Başlat</button>
             </div>
         </div>
 
@@ -148,7 +177,7 @@
             <div class="turn-status" id="turnStatus">
                 <p class="turn-message" id="turnMessage">Oyun başlıyor...</p>
             </div>
-            
+
             <div id="passNotification" class="pass-notification" style="display: none;">
                 Sıra Geçti! Acele Et!
             </div>
@@ -176,11 +205,11 @@
                 <h3>Kategori Seçin</h3>
                 <div id="categoriesContainer"></div>
             </div>
-            
+
             <!-- Jokers Panel -->
             <div class="jokers-panel" id="jokersPanel">
-                 <h3>Jokerler</h3>
-                 <div class="jokers-grid">
+                <h3>Jokerler</h3>
+                <div class="jokers-grid">
                     <button class="joker-btn" id="jokerDouble" data-joker="double">
                         <div class="joker-icon">x2</div>
                         <div class="joker-name">Çift Puan</div>
@@ -189,7 +218,7 @@
                         <div class="joker-icon">⏱️</div>
                         <div class="joker-name">Ek Süre</div>
                     </button>
-                 </div>
+                </div>
             </div>
 
             <!-- Player List (In-Game) -->
@@ -197,10 +226,10 @@
                 <div id="playersListContainer"></div>
             </div>
         </div>
-        
+
         <!-- Overlays -->
         <div id="toastContainer" class="toast-container"></div>
-        
+
         <!-- Correct Answer Modal -->
         <div id="correctAnswerModal" class="correct-answer-modal">
             <div class="correct-answer-content">
@@ -231,8 +260,8 @@
         // --- Name Screen ---
         document.getElementById('submitNameBtn').addEventListener('click', () => {
             const name = document.getElementById('playerNameInput').value.trim();
-            if(!name) return showToast('Lütfen isim girin', 'error');
-            
+            if (!name) return showToast('Lütfen isim girin', 'error');
+
             playerName = name;
             localStorage.setItem('trivia_player_name', name);
             document.getElementById('welcomeName').textContent = name;
@@ -246,19 +275,37 @@
 
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
             const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if(code.length !== 4) return showToast('4 haneli kod girin', 'error');
+            if (code.length !== 4) return showToast('4 haneli kod girin', 'error');
             socket.emit('joinRoom', code);
         });
-        
+
         // --- Socket Events ---
-        
+
+        socket.on('connect', () => {
+            // Auto-reconnect if session exists
+            const savedRoom = localStorage.getItem('trivia_room_id');
+            const savedName = localStorage.getItem('trivia_player_name');
+            const savedToken = localStorage.getItem('trivia_session_token');
+
+            if (savedRoom && savedName && savedToken) {
+                console.log('Attempting reconnection to room:', savedRoom);
+                socket.emit('rejoinGame', {
+                    roomId: savedRoom,
+                    playerName: savedName,
+                    token: savedToken
+                });
+            }
+        });
+
         socket.on('roomCreated', (data) => {
             currentRoomId = data.roomId;
+            localStorage.setItem('trivia_room_id', currentRoomId); // Save Room ID
             joinGameAsPlayer();
         });
 
         socket.on('roomJoined', (data) => {
             currentRoomId = data.roomId;
+            localStorage.setItem('trivia_room_id', currentRoomId); // Save Room ID
             joinGameAsPlayer();
         });
 
@@ -269,17 +316,36 @@
             });
         }
 
+        socket.on('rejoinSuccess', (data) => {
+            // Handle successful reconnection
+            playerId = data.playerId;
+            playerName = data.playerName;
+            currentRoomId = data.roomId;
+
+            // Restore UI state
+            document.getElementById('welcomeName').textContent = playerName;
+            document.getElementById('roomCodeDisplay').textContent = currentRoomId;
+
+            if (data.gameStarted) {
+                showScreen('dashboardScreen');
+                showToast('Oyuna tekrar bağlandınız!', 'success');
+            } else {
+                showScreen('lobbyScreen');
+                showToast('Odaya tekrar bağlandınız!', 'success');
+            }
+        });
+
         socket.on('joinSuccess', (data) => {
             playerId = data.playerId;
-            if(data.playerToken) localStorage.setItem('trivia_session_token', data.playerToken);
-            
+            if (data.playerToken) localStorage.setItem('trivia_session_token', data.playerToken);
+
             document.getElementById('roomCodeDisplay').textContent = currentRoomId;
             showScreen('lobbyScreen');
         });
 
         socket.on('playerListUpdate', (data) => {
             updatePlayerList(data.players, data.totalPlayers);
-            if(data.totalPlayers >= 2 && !data.gameStarted) {
+            if (data.totalPlayers >= 2 && !data.gameStarted) {
                 document.getElementById('startGameBtn').style.display = 'block';
             }
         });
@@ -297,8 +363,8 @@
         });
 
         socket.on('newTurn', (data) => {
-             updateTurnUI(data.currentPlayerId, data.currentPlayerName);
-             hideQuestion(); // Clean up previous question UI
+            updateTurnUI(data.currentPlayerId, data.currentPlayerName);
+            hideQuestion(); // Clean up previous question UI
         });
 
         socket.on('yourTurn', (data) => {
@@ -315,7 +381,7 @@
             document.getElementById('categorySelection').style.display = 'none';
             document.getElementById('questionDisplay').style.display = 'block';
             document.getElementById('answerButtons').style.display = 'block';
-            
+
             // Populate Question
             document.getElementById('questionCategory').textContent = data.category;
             document.getElementById('questionDifficulty').textContent = data.difficulty;
@@ -324,42 +390,38 @@
             document.getElementById('questionTimer').textContent = data.timer;
             document.getElementById('questionTimer').className = 'question-timer'; // Reset warning
 
+            // Sync active player state with turn ownership at start of question
+            isActivePlayer = isMyTurn;
+
             // Populate Options
             const grid = document.getElementById('optionsGrid');
             grid.innerHTML = '';
-            const letters = ['A','B','C','D'];
+            const letters = ['A', 'B', 'C', 'D'];
             data.question.options.forEach((opt, i) => {
                 const btn = document.createElement('button');
                 btn.className = 'answer-btn';
                 btn.innerHTML = `<strong>${letters[i]}</strong> ${opt}`;
                 btn.onclick = () => submitAnswer(opt, btn);
-                
-                // If not active player, disable
-                // Wait, initially ACTIVE player is the turn owner.
-                // We need to know who is active.
-                // We'll trust backend validation and UI state.
-                // If isMyTurn (turn owner), I am active initially.
-                // If passed, we'll get 'questionPassed'.
-                
-                if(!isActivePlayer) {
+
+                if (!isActivePlayer) {
                     btn.disabled = true;
                     btn.style.opacity = 0.6;
                 }
                 grid.appendChild(btn);
             });
-            
+
             document.getElementById('passNotification').style.display = 'none';
         });
 
         socket.on('questionPassed', (data) => {
             // data: { previousPlayerId, nextPlayerId, nextPlayerName, message }
             showToast(data.message, 'warning');
-            
-            if(data.nextPlayerId === playerId) {
+
+            if (data.nextPlayerId === playerId) {
                 isActivePlayer = true;
                 showToast('Sıra sana geçti! HIZLI OL!', 'warning');
                 document.getElementById('passNotification').style.display = 'block';
-                
+
                 // Enable buttons
                 const buttons = document.querySelectorAll('.answer-btn');
                 buttons.forEach(btn => {
@@ -370,45 +432,45 @@
                 isActivePlayer = false;
                 document.getElementById('passNotification').style.display = 'none';
             }
-            
+
             // Update UI text
             document.getElementById('turnMessage').textContent = `Sıra Geçti: ${data.nextPlayerName}`;
         });
 
         socket.on('timerUpdate', (data) => {
-             const timerEl = document.getElementById('questionTimer');
-             timerEl.textContent = data.timeLeft;
-             if(data.timeLeft <= 3) timerEl.classList.add('danger'); // Add styling for danger
+            const timerEl = document.getElementById('questionTimer');
+            timerEl.textContent = data.timeLeft;
+            if (data.timeLeft <= 3) timerEl.classList.add('danger'); // Add styling for danger
         });
 
         socket.on('answerResult', (data) => {
             // Show result toast
-            if(data.correct) {
-                if(data.playerId === playerId) showToast(`Doğru! +${data.points}`, 'success');
+            if (data.correct) {
+                if (data.playerId === playerId) showToast(`Doğru! +${data.points}`, 'success');
                 else showToast(`${data.playerName} Doğru Bildi!`, 'info');
             } else {
-                if(data.playerId === playerId) showToast('Yanlış!', 'error');
+                if (data.playerId === playerId) showToast('Yanlış!', 'error');
                 else showToast(`${data.playerName} Yanlış yaptı!`, 'info');
             }
         });
 
         socket.on('showCorrectAnswer', (data) => {
-             // Show Modal
-             const modal = document.getElementById('correctAnswerModal');
-             document.getElementById('modalAnswerText').textContent = data.correctAnswer;
-             document.getElementById('modalExplanation').textContent = data.explanation;
-             
-             if(data.wasAnswered) document.getElementById('modalStatusText').textContent = "Cevaplandı!";
-             else document.getElementById('modalStatusText').textContent = "Kimse bilemedi!";
-             
-             modal.classList.add('active');
-             
-             setTimeout(() => {
-                 modal.classList.remove('active');
-                 hideQuestion();
-             }, 3500);
+            // Show Modal
+            const modal = document.getElementById('correctAnswerModal');
+            document.getElementById('modalAnswerText').textContent = data.correctAnswer;
+            document.getElementById('modalExplanation').textContent = data.explanation;
+
+            if (data.wasAnswered) document.getElementById('modalStatusText').textContent = "Cevaplandı!";
+            else document.getElementById('modalStatusText').textContent = "Kimse bilemedi!";
+
+            modal.classList.add('active');
+
+            setTimeout(() => {
+                modal.classList.remove('active');
+                hideQuestion();
+            }, 3500);
         });
-        
+
         // --- Helpers ---
 
         function submitAnswer(answer, btnElement) {
@@ -417,40 +479,40 @@
             document.querySelectorAll('.answer-btn').forEach(btn => btn.disabled = true);
             isActivePlayer = false;
         }
-        
+
         function hideQuestion() {
             document.getElementById('questionDisplay').style.display = 'none';
             document.getElementById('answerButtons').style.display = 'none';
             document.getElementById('passNotification').style.display = 'none';
             // Also reset category selection visibility based on turn
-            if(isMyTurn) document.getElementById('categorySelection').style.display = 'block';
+            if (isMyTurn) document.getElementById('categorySelection').style.display = 'block';
         }
 
         function updateTurnUI(currentId, currentName) {
             isMyTurn = (currentId === playerId);
             isActivePlayer = isMyTurn; // Reset to turn owner
-            
+
             const msg = isMyTurn ? 'Senin Sıran!' : `Sıra: ${currentName}`;
             document.getElementById('turnMessage').textContent = msg;
-            
-            if(isMyTurn) document.getElementById('turnStatus').classList.add('your-turn');
+
+            if (isMyTurn) document.getElementById('turnStatus').classList.add('your-turn');
             else document.getElementById('turnStatus').classList.remove('your-turn');
         }
 
         function updatePlayerList(players) {
             const list = document.getElementById(document.getElementById('dashboardScreen').classList.contains('active') ? 'playersListContainer' : 'lobbyPlayerList');
-            if(!list) return;
-            
+            if (!list) return;
+
             list.innerHTML = players.map(p => `
                 <div class="player-card ${p.id === playerId ? 'my-player' : ''}">
                    <span>${p.name} ${p.id === playerId ? '(Sen)' : ''}</span>
                    <strong>${p.score}</strong>
                 </div>
             `).join('');
-            
+
             // Allow update of dashboard list if active
-            if(document.getElementById('playersListContainer')) {
-                 document.getElementById('playersListContainer').innerHTML = players.map(p => `
+            if (document.getElementById('playersListContainer')) {
+                document.getElementById('playersListContainer').innerHTML = players.map(p => `
                 <div class="player-card ${p.isActive ? 'active-player' : ''} ${p.id === playerId ? 'my-player' : ''}">
                    <span>${p.name}</span>
                    <strong>${p.score}p</strong>
@@ -458,8 +520,8 @@
             `).join('');
             }
         }
-        
-        function showToast(msg, type='info') {
+
+        function showToast(msg, type = 'info') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
@@ -471,7 +533,7 @@
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
-        
+
         // Joker listeners
         document.querySelectorAll('.joker-btn').forEach(btn => {
             btn.onclick = () => {
@@ -479,37 +541,38 @@
                 socket.emit('useJoker', { jokerType: type });
             };
         });
-        
+
         // Joker updates
         socket.on('jokerUsed', (data) => showToast(`${data.playerName} Joker Kullandı: ${data.jokerType}`, 'special'));
-        
+
         // --- Categories Mock ---
         // (Copying category list from previous file for brevity, in real app it should be dynamic)
         const CATEGORIES = ['Sanat', 'Coğrafya', 'Genel Kültür', 'Tarih', 'Bilim', 'Spor', 'Mantık'];
         function buildCategorySelection() {
-             const c = document.getElementById('categoriesContainer');
-             c.innerHTML = '';
-             CATEGORIES.forEach(cat => {
-                 const d = document.createElement('div');
-                 d.className = 'category-group';
-                 d.innerHTML = `<h4>${cat}</h4>`;
-                 // Add buttons for difficulty
-                 ['easy','medium','hard'].forEach(diff => {
-                     const btn = document.createElement('button');
-                     btn.className = 'difficulty-btn-mini ' + diff;
-                     btn.textContent = diff.toUpperCase();
-                     btn.onclick = () => socket.emit('selectQuestion', { category: cat, difficulty: diff });
-                     d.appendChild(btn);
-                 });
-                 c.appendChild(d);
-             });
+            const c = document.getElementById('categoriesContainer');
+            c.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const d = document.createElement('div');
+                d.className = 'category-group';
+                d.innerHTML = `<h4>${cat}</h4>`;
+                // Add buttons for difficulty
+                ['easy', 'medium', 'hard'].forEach(diff => {
+                    const btn = document.createElement('button');
+                    btn.className = 'difficulty-btn-mini ' + diff;
+                    btn.textContent = diff.toUpperCase();
+                    btn.onclick = () => socket.emit('selectQuestion', { category: cat, difficulty: diff });
+                    d.appendChild(btn);
+                });
+                c.appendChild(d);
+            });
         }
         function updateJokers(jokers) {
-             // Update disable state
-             if(!jokers.double) document.getElementById('jokerDouble').disabled = true;
-             if(!jokers.extraTime) document.getElementById('jokerExtraTime').disabled = true;
+            // Update disable state
+            if (!jokers.double) document.getElementById('jokerDouble').disabled = true;
+            if (!jokers.extraTime) document.getElementById('jokerExtraTime').disabled = true;
         }
 
     </script>
 </body>
+
 </html>

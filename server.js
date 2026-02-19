@@ -54,6 +54,61 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- Reconnection Logic ---
+  socket.on('rejoinGame', (data) => {
+    const { roomId, token } = data;
+    if (games.has(roomId)) {
+      const gameManager = games.get(roomId);
+      if (gameManager.playerSessions[token]) {
+        socket.join(roomId);
+        socket.data.roomId = roomId;
+
+        // Restore player connection in GameManager
+        const result = gameManager.handlePlayerJoin(socket.id, data.playerName, token);
+
+        socket.emit('rejoinSuccess', {
+          roomId,
+          playerId: socket.id,
+          playerName: result.playerName,
+          gameStarted: gameManager.gameState.gameStarted
+        });
+
+        // Trigger state sync
+        if (gameManager.gameState.gameStarted) {
+          // Sync Game State similar to joinAsPlayer
+          socket.emit('gameStarted', {
+            message: 'Oyuna geri dönüldü!',
+            currentPlayerId: gameManager.gameState.currentTurn,
+            currentPlayerName: gameManager.gameState.players[gameManager.gameState.currentTurn].name
+          });
+          // Sync active question if any
+          if (gameManager.gameState.currentQuestion) {
+            socket.emit('questionSelected', {
+              question: gameManager.gameState.currentQuestion,
+              timer: gameManager.gameState.questionTimer,
+              points: DIFFICULTIES[gameManager.gameState.currentDifficulty].points,
+              category: gameManager.gameState.currentCategory,
+              difficulty: gameManager.gameState.currentDifficulty
+            });
+          }
+        } else {
+          // Sync Lobby
+          gameManager.io.to(roomId).emit('playerListUpdate', {
+            players: gameManager.getPlayersData(),
+            totalPlayers: Object.keys(gameManager.gameState.players).length,
+            gameStarted: false
+          });
+        }
+
+        console.log(`Player reconnected to room ${roomId}`);
+      } else {
+        socket.emit('error', { message: 'Oturum bulunamadı veya süresi dolmuş.' });
+      }
+    } else {
+      socket.emit('error', { message: 'Oda artık mevcut değil.' });
+    }
+  });
+
   // --- Player Management ---
 
   socket.on('joinAsPlayer', (data) => {
@@ -132,6 +187,11 @@ io.on('connection', (socket) => {
 
     if (!gameManager.gameState.players[socket.id]) {
       socket.emit('error', { message: 'Önce oyuna katılmalısın!' });
+      return;
+    }
+
+    if (gameManager.gameState.gameStarted) {
+      socket.emit('error', { message: 'Oyun zaten başladı!' });
       return;
     }
 
@@ -284,9 +344,7 @@ io.on('connection', (socket) => {
       // Handling Steal/Pass Points:
       // If it was a pass (activePlayer != currentTurn), maybe half points?
       // Requirement says: "Question passes to opponent". Doesn't specify point reduction.
-      // Usually these games halve points on steal, but prompt didn't say.
-      // I'll keep full points or logic from previous "Steal" (half points).
-      // Previous code: `stealPoints = Math.floor(basePoints / 2);`
+      // We will halve points if it is a steal/pass answer.
 
       const isSteal = socket.id !== gameState.currentTurn;
       if (isSteal) {
@@ -326,17 +384,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Point Theft (Keeping for legacy support if Joker exists in frontend)
-  socket.on('usePointTheft', () => {
-    // ... same logic as before but with getGame() ...
-    // Can implement if needed, but passing on it for now to focus on core tasks
-    // The prompt didn't ask to remove it, but I need to be careful with time.
-    // I'll leave it as TODO or omit if frontend doesn't use it heavily.
-    // Frontend HAS the button. I should probably include it.
-    const gameManager = getGame();
-    if (!gameManager) return;
-    // ... (implementation omitted for brevity, adding if requested)
-  });
+
 
   socket.on('disconnect', () => {
     // We need to find which game the socket was in.

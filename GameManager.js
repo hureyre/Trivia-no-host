@@ -20,10 +20,10 @@ class GameManager {
             currentTurn: null,
             gameStarted: false,
             currentQuestion: null,
+            currentQuestion: null,
             questionTimer: null,
             timerInterval: null,
-            questionTimer: null,
-            timerInterval: null,
+            attemptsForQuestion: [], // Track player IDs who attempted current question
             attemptsForQuestion: [], // Track player IDs who attempted current question
             currentCategory: null,
             currentDifficulty: null,
@@ -54,8 +54,7 @@ class GameManager {
             questionsAsMainPlayer: savedSession ? savedSession.questionsAsMainPlayer : 0,
             jokers: savedSession ? savedSession.jokers : {
                 double: true,
-                extraTime: true,
-                pointTheft: true
+                extraTime: true
             },
             isActive: false
         };
@@ -246,7 +245,7 @@ class GameManager {
     handleTimeOut() {
         // Player ran out of time
         const currentPlayer = this.gameState.activePlayer || this.gameState.currentTurn;
-        
+
         this.io.to(this.roomId).emit('playerAnswerResult', {
             playerId: currentPlayer,
             playerName: this.gameState.players[currentPlayer].name,
@@ -269,7 +268,7 @@ class GameManager {
             // For 2 players, it's just the other one.
             const nextPlayerId = remainingPlayers[0]; // Simplest "next" logic
             this.gameState.activePlayer = nextPlayerId;
-            
+
             this.io.to(this.roomId).emit('questionPassed', {
                 previousPlayerId: this.gameState.attemptsForQuestion[this.gameState.attemptsForQuestion.length - 1],
                 nextPlayerId: nextPlayerId,
@@ -287,10 +286,10 @@ class GameManager {
     }
 
     // Replaces enterStealPhase and parts of old logic
-    
+
     endQuestion(wasAnswered) {
         this.stopTimer();
-        this.gameState.activePlayer = null; 
+        this.gameState.activePlayer = null;
 
         setTimeout(() => {
             if (this.gameState.currentQuestion) {
