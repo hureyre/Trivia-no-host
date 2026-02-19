@@ -12,8 +12,9 @@ const QUESTIONS_PER_CATEGORY = 2;
 const TOTAL_QUESTIONS_PER_PLAYER = CATEGORIES.length * QUESTIONS_PER_CATEGORY; // 14 questions
 
 class GameManager {
-    constructor(io) {
+    constructor(io, roomId) {
         this.io = io;
+        this.roomId = roomId;
         this.gameState = {
             players: {},
             currentTurn: null,
@@ -21,8 +22,9 @@ class GameManager {
             currentQuestion: null,
             questionTimer: null,
             timerInterval: null,
-            isStealPhase: false,
-            stealBuzzOrder: [],
+            questionTimer: null,
+            timerInterval: null,
+            attemptsForQuestion: [], // Track player IDs who attempted current question
             currentCategory: null,
             currentDifficulty: null,
             usedQuestions: [],
@@ -138,6 +140,11 @@ class GameManager {
 
         this.gameState.gameStarted = true;
         this.gameState.currentTurn = Object.keys(this.gameState.players)[0];
+        this.io.to(this.roomId).emit('playerListUpdate', {
+            players: this.getPlayersData(),
+            totalPlayers: Object.keys(this.gameState.players).length,
+            gameStarted: this.gameState.gameStarted
+        });
         return true;
     }
 
@@ -148,20 +155,22 @@ class GameManager {
         }
 
         this.gameState.currentQuestion = null;
-        this.gameState.isStealPhase = false;
-        this.gameState.stealBuzzOrder = [];
+        this.gameState.activePlayer = null; // Clear active player
+        this.gameState.attemptsForQuestion = [];
         this.gameState.pendingJokers = { double: false, extraTime: false };
 
         this.gameState.currentTurn = this.getNextPlayer();
+        this.gameState.activePlayer = this.gameState.currentTurn; // Initial active player is turn owner
 
-        this.io.emit('newTurn', {
+        this.io.to(this.roomId).emit('gameStarted', {
+            message: 'Oyun Başladı!',
             currentPlayerId: this.gameState.currentTurn,
             currentPlayerName: this.gameState.players[this.gameState.currentTurn].name,
             players: this.getPlayersData()
         });
 
         this.io.to(this.gameState.currentTurn).emit('yourTurn', {
-            message: 'It\'s your turn! Choose a category and difficulty.',
+            message: 'Sıra sende! Kategori ve zorluk seç.',
             availableJokers: this.gameState.players[this.gameState.currentTurn].jokers
         });
     }
@@ -209,16 +218,16 @@ class GameManager {
     }
 
     startQuestionTimer(duration) {
-        this.stopTimer(); // Ensure previous timer is cleared
+        this.stopTimer();
 
         let timeLeft = duration;
         this.gameState.questionTimer = timeLeft;
-        this.io.emit('timerUpdate', { timeLeft });
+        this.io.to(this.roomId).emit('timerUpdate', { timeLeft });
 
         this.gameState.timerInterval = setInterval(() => {
             timeLeft--;
             this.gameState.questionTimer = timeLeft;
-            this.io.emit('timerUpdate', { timeLeft });
+            this.io.to(this.roomId).emit('timerUpdate', { timeLeft });
 
             if (timeLeft <= 0) {
                 this.stopTimer();
@@ -235,52 +244,67 @@ class GameManager {
     }
 
     handleTimeOut() {
-        if (!this.gameState.isStealPhase) {
-            // Main player timeout -> Steal Phase
-            this.io.emit('mainPlayerTimeout', {
-                message: 'Time\'s up! Other players can now buzz in to steal.',
-                correctAnswer: this.gameState.currentQuestion.correctAnswer
+        // Player ran out of time
+        const currentPlayer = this.gameState.activePlayer || this.gameState.currentTurn;
+        
+        this.io.to(this.roomId).emit('playerAnswerResult', {
+            playerId: currentPlayer,
+            playerName: this.gameState.players[currentPlayer].name,
+            correct: false,
+            message: 'Süre doldu!'
+        });
+
+        this.gameState.attemptsForQuestion.push(currentPlayer);
+        this.passTurnOrEnd();
+    }
+
+    passTurnOrEnd() {
+        // Check if there are players who haven't attempted this question yet
+        const playerIds = Object.keys(this.gameState.players);
+        const remainingPlayers = playerIds.filter(id => !this.gameState.attemptsForQuestion.includes(id));
+
+        if (remainingPlayers.length > 0) {
+            // Pass to next player
+            // Simple logic: just pick the next one in the list (or circular)
+            // For 2 players, it's just the other one.
+            const nextPlayerId = remainingPlayers[0]; // Simplest "next" logic
+            this.gameState.activePlayer = nextPlayerId;
+            
+            this.io.to(this.roomId).emit('questionPassed', {
+                previousPlayerId: this.gameState.attemptsForQuestion[this.gameState.attemptsForQuestion.length - 1],
+                nextPlayerId: nextPlayerId,
+                nextPlayerName: this.gameState.players[nextPlayerId].name,
+                message: 'Soru pas geçti! Süre: 3 saniye.'
             });
-            this.enterStealPhase();
+
+            // Start 3 second timer
+            this.startQuestionTimer(3);
+
         } else {
-            // Steal phase timeout
-            this.io.emit('stealPhaseTimeout', {
-                message: 'No one buzzed in time!',
-                correctAnswer: this.gameState.currentQuestion.correctAnswer
-            });
+            // Everyone failed
             this.endQuestion(false);
         }
     }
 
-    enterStealPhase() {
-        this.gameState.isStealPhase = true;
-        this.gameState.stealBuzzOrder = [];
-
-        Object.keys(this.gameState.players).forEach(playerId => {
-            if (playerId !== this.gameState.currentTurn) {
-                this.io.to(playerId).emit('enableBuzzer', { canBuzz: true });
-            }
-        });
-
-        const stealTime = DIFFICULTIES[this.gameState.currentDifficulty].time;
-        this.startQuestionTimer(stealTime);
-    }
-
+    // Replaces enterStealPhase and parts of old logic
+    
     endQuestion(wasAnswered) {
         this.stopTimer();
+        this.gameState.activePlayer = null; 
 
         setTimeout(() => {
             if (this.gameState.currentQuestion) {
-                this.io.emit('showCorrectAnswer', {
+                this.io.to(this.roomId).emit('showCorrectAnswer', {
                     correctAnswer: this.gameState.currentQuestion.correctAnswer,
-                    explanation: this.gameState.currentQuestion.explanation || ''
+                    explanation: this.gameState.currentQuestion.explanation || '',
+                    wasAnswered: wasAnswered
                 });
             }
 
             setTimeout(() => {
                 this.nextTurn();
-            }, 3000);
-        }, 2000);
+            }, 4000); // 4 seconds to read explanation
+        }, 1000);
     }
 
     checkGameEnd() {
@@ -308,7 +332,7 @@ class GameManager {
             }
         });
 
-        this.io.emit('gameEnded', {
+        this.io.to(this.roomId).emit('gameEnded', {
             winner: winner ? {
                 id: winner,
                 name: this.gameState.players[winner].name,
