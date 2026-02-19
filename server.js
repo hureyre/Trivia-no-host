@@ -177,257 +177,259 @@ io.on('connection', (socket) => {
         }
       }
     }
-    // --- Game Control ---
+  });
 
-    socket.on('startGame', () => {
-      console.log(`[DEBUG] startGame event received from ${socket.id}`);
-      const gameManager = getGame();
+  // --- Game Control ---
 
-      if (!gameManager) {
-        console.log(`[DEBUG] Game manager not found for room: ${socket.data.roomId}`);
-        return;
-      }
-      console.log(`[DEBUG] details: Room=${gameManager.roomId}, Players=${Object.keys(gameManager.gameState.players).length}`);
+  socket.on('startGame', () => {
+    console.log(`[DEBUG] startGame event received from ${socket.id}`);
+    const gameManager = getGame();
 
-      if (!gameManager.gameState.players[socket.id]) {
-        console.log(`[DEBUG] Player ${socket.id} not found in room ${gameManager.roomId}`);
-        socket.emit('error', { message: 'Önce oyuna katılmalısın!' });
-        return;
-      }
+    if (!gameManager) {
+      console.log(`[DEBUG] Game manager not found for room: ${socket.data.roomId}`);
+      return;
+    }
+    console.log(`[DEBUG] details: Room=${gameManager.roomId}, Players=${Object.keys(gameManager.gameState.players).length}`);
 
-      if (gameManager.gameState.gameStarted) {
-        console.log(`[DEBUG] Game already started in room ${gameManager.roomId}`);
-        socket.emit('error', { message: 'Oyun zaten başladı!' });
-        return;
-      }
+    if (!gameManager.gameState.players[socket.id]) {
+      console.log(`[DEBUG] Player ${socket.id} not found in room ${gameManager.roomId}`);
+      socket.emit('error', { message: 'Önce oyuna katılmalısın!' });
+      return;
+    }
 
-      const started = gameManager.startGame();
-      console.log(`[DEBUG] Game start result: ${started}`);
+    if (gameManager.gameState.gameStarted) {
+      console.log(`[DEBUG] Game already started in room ${gameManager.roomId}`);
+      socket.emit('error', { message: 'Oyun zaten başladı!' });
+      return;
+    }
 
-      if (!started) {
-        socket.emit('error', { message: 'En az 2 oyuncu gerekli!' });
-        return;
-      }
+    const started = gameManager.startGame();
+    console.log(`[DEBUG] Game start result: ${started}`);
 
-      console.log(`Game started in room ${gameManager.roomId}`);
-    });
+    if (!started) {
+      socket.emit('error', { message: 'En az 2 oyuncu gerekli!' });
+      return;
+    }
 
-    // Use Joker
-    socket.on('useJoker', (data) => {
-      const gameManager = getGame();
-      if (!gameManager) return;
+    console.log(`Game started in room ${gameManager.roomId}`);
+  });
 
-      const { jokerType } = data;
-      const gameState = gameManager.gameState;
+  // Use Joker
+  socket.on('useJoker', (data) => {
+    const gameManager = getGame();
+    if (!gameManager) return;
 
-      if (socket.id !== gameState.currentTurn) {
-        socket.emit('error', { message: 'Sıra sende değil!' });
-        return;
-      }
+    const { jokerType } = data;
+    const gameState = gameManager.gameState;
 
-      if (jokerType === 'double' && gameState.currentQuestion) {
-        socket.emit('error', { message: 'Çift Bela sorudan ÖNCE kullanılmalı!' });
-        return;
-      }
+    if (socket.id !== gameState.currentTurn) {
+      socket.emit('error', { message: 'Sıra sende değil!' });
+      return;
+    }
 
-      if (gameManager.useJoker(socket.id, jokerType)) {
-        if (jokerType === 'double') {
-          io.to(gameManager.roomId).emit('jokerUsed', {
-            playerId: socket.id,
-            playerName: gameState.players[socket.id].name,
-            jokerType: 'Double Trouble',
-            message: 'Doğru cevap 2 kat puan!'
-          });
-        } else if (jokerType === 'extraTime') {
-          io.to(gameManager.roomId).emit('jokerUsed', {
-            playerId: socket.id,
-            playerName: gameState.players[socket.id].name,
-            jokerType: 'Extra Time',
-            message: 'Süre uzatıldı!'
-          });
+    if (jokerType === 'double' && gameState.currentQuestion) {
+      socket.emit('error', { message: 'Çift Bela sorudan ÖNCE kullanılmalı!' });
+      return;
+    }
 
-          if (gameState.currentQuestion && gameState.questionTimer) {
-            gameManager.stopTimer();
-            const difficulty = gameState.currentDifficulty;
-            const extendedTime = DIFFICULTIES[difficulty].time * 2;
-            gameManager.startQuestionTimer(extendedTime);
-          }
-        }
-        socket.emit('jokerActivated', { jokerType });
-      } else {
-        socket.emit('error', { message: 'Joker zaten kullanıldı veya geçersiz!' });
-      }
-    });
-
-    // Select Question
-    socket.on('selectQuestion', (data) => {
-      const gameManager = getGame();
-      if (!gameManager) return;
-
-      const { category, difficulty } = data;
-      const gameState = gameManager.gameState;
-
-      if (socket.id !== gameState.currentTurn) {
-        socket.emit('error', { message: 'Sıra sende değil!' });
-        return;
-      }
-
-      if (gameState.currentQuestion) {
-        socket.emit('error', { message: 'Soru zaten aktif!' });
-        return;
-      }
-
-      if (!CATEGORIES.includes(category)) {
-        socket.emit('error', { message: 'Geçersiz kategori!' });
-        return;
-      }
-
-      // Check category limit
-      const attempts = gameState.categoryAttempts[socket.id][category];
-      if (attempts >= QUESTIONS_PER_CATEGORY) {
-        socket.emit('error', {
-          message: `${category} kategorisinden hakkın doldu!`
+    if (gameManager.useJoker(socket.id, jokerType)) {
+      if (jokerType === 'double') {
+        io.to(gameManager.roomId).emit('jokerUsed', {
+          playerId: socket.id,
+          playerName: gameState.players[socket.id].name,
+          jokerType: 'Double Trouble',
+          message: 'Doğru cevap 2 kat puan!'
         });
-        return;
+      } else if (jokerType === 'extraTime') {
+        io.to(gameManager.roomId).emit('jokerUsed', {
+          playerId: socket.id,
+          playerName: gameState.players[socket.id].name,
+          jokerType: 'Extra Time',
+          message: 'Süre uzatıldı!'
+        });
+
+        if (gameState.currentQuestion && gameState.questionTimer) {
+          gameManager.stopTimer();
+          const difficulty = gameState.currentDifficulty;
+          const extendedTime = DIFFICULTIES[difficulty].time * 2;
+          gameManager.startQuestionTimer(extendedTime);
+        }
+      }
+      socket.emit('jokerActivated', { jokerType });
+    } else {
+      socket.emit('error', { message: 'Joker zaten kullanıldı veya geçersiz!' });
+    }
+  });
+
+  // Select Question
+  socket.on('selectQuestion', (data) => {
+    const gameManager = getGame();
+    if (!gameManager) return;
+
+    const { category, difficulty } = data;
+    const gameState = gameManager.gameState;
+
+    if (socket.id !== gameState.currentTurn) {
+      socket.emit('error', { message: 'Sıra sende değil!' });
+      return;
+    }
+
+    if (gameState.currentQuestion) {
+      socket.emit('error', { message: 'Soru zaten aktif!' });
+      return;
+    }
+
+    if (!CATEGORIES.includes(category)) {
+      socket.emit('error', { message: 'Geçersiz kategori!' });
+      return;
+    }
+
+    // Check category limit
+    const attempts = gameState.categoryAttempts[socket.id][category];
+    if (attempts >= QUESTIONS_PER_CATEGORY) {
+      socket.emit('error', {
+        message: `${category} kategorisinden hakkın doldu!`
+      });
+      return;
+    }
+
+    const question = gameManager.selectQuestion(socket.id, category, difficulty);
+
+    if (!question) {
+      socket.emit('error', { message: 'Bu kategoride soru kalmadı!' });
+      return;
+    }
+
+    let timerDuration = DIFFICULTIES[difficulty].time;
+    if (gameState.pendingJokers.extraTime) {
+      timerDuration *= 2;
+    }
+
+    io.to(gameManager.roomId).emit('questionSelected', {
+      category,
+      difficulty,
+      question: {
+        id: question.id,
+        text: question.question,
+        options: question.options
+      },
+      points: DIFFICULTIES[difficulty].points,
+      timer: timerDuration,
+      doubleActive: gameState.pendingJokers.double
+    });
+
+    gameManager.startQuestionTimer(timerDuration);
+  });
+
+  // Submit Answer
+  socket.on('submitAnswer', (data) => {
+    const gameManager = getGame();
+    if (!gameManager) return;
+
+    const { answer } = data;
+    const gameState = gameManager.gameState;
+
+    if (!gameState.currentQuestion) {
+      socket.emit('error', { message: 'Aktif soru yok!' });
+      return;
+    }
+
+    // Check if it's the ACTIVE player's turn (handles pass mechanic)
+    // gameManager.gameState.activePlayer should be set. If not, fallback to currentTurn
+    const activePlayerId = gameState.activePlayer || gameState.currentTurn;
+
+    if (socket.id !== activePlayerId) {
+      socket.emit('error', { message: 'Cevaplama sırası sende değil!' });
+      return;
+    }
+
+    const isCorrect = answer === gameState.currentQuestion.correctAnswer;
+
+    // Always stop timer when answer submitted
+    gameManager.stopTimer();
+
+    if (isCorrect) {
+      // Calculation
+      let points = DIFFICULTIES[gameState.currentDifficulty].points;
+
+      // Handling Steal/Pass Points:
+      // If it was a pass (activePlayer != currentTurn), maybe half points?
+      // Requirement says: "Question passes to opponent". Doesn't specify point reduction.
+      // We will halve points if it is a steal/pass answer.
+
+      const isSteal = socket.id !== gameState.currentTurn;
+      if (isSteal) {
+        points = Math.floor(points / 2);
+      } else {
+        if (gameState.pendingJokers.double) points *= 2;
       }
 
-      const question = gameManager.selectQuestion(socket.id, category, difficulty);
+      gameState.players[socket.id].score += points;
 
-      if (!question) {
-        socket.emit('error', { message: 'Bu kategoride soru kalmadı!' });
-        return;
-      }
-
-      let timerDuration = DIFFICULTIES[difficulty].time;
-      if (gameState.pendingJokers.extraTime) {
-        timerDuration *= 2;
-      }
-
-      io.to(gameManager.roomId).emit('questionSelected', {
-        category,
-        difficulty,
-        question: {
-          id: question.id,
-          text: question.question,
-          options: question.options
-        },
-        points: DIFFICULTIES[difficulty].points,
-        timer: timerDuration,
-        doubleActive: gameState.pendingJokers.double
+      io.to(gameManager.roomId).emit('answerResult', {
+        playerId: socket.id,
+        playerName: gameState.players[socket.id].name,
+        correct: true,
+        points,
+        newScore: gameState.players[socket.id].score
       });
 
-      gameManager.startQuestionTimer(timerDuration);
-    });
+      // Point Theft Joker Logic support (if we keep it)
+      // gameState.lastEarnedPoints = { playerId: socket.id, points: points };
 
-    // Submit Answer
-    socket.on('submitAnswer', (data) => {
-      const gameManager = getGame();
-      if (!gameManager) return;
+      gameManager.endQuestion(true);
 
-      const { answer } = data;
-      const gameState = gameManager.gameState;
+    } else {
+      // WRONG Answer
+      io.to(gameManager.roomId).emit('answerResult', {
+        playerId: socket.id,
+        playerName: gameState.players[socket.id].name,
+        correct: false
+      });
 
-      if (!gameState.currentQuestion) {
-        socket.emit('error', { message: 'Aktif soru yok!' });
-        return;
-      }
+      // Add to attempts
+      gameState.attemptsForQuestion.push(socket.id);
 
-      // Check if it's the ACTIVE player's turn (handles pass mechanic)
-      // gameManager.gameState.activePlayer should be set. If not, fallback to currentTurn
-      const activePlayerId = gameState.activePlayer || gameState.currentTurn;
-
-      if (socket.id !== activePlayerId) {
-        socket.emit('error', { message: 'Cevaplama sırası sende değil!' });
-        return;
-      }
-
-      const isCorrect = answer === gameState.currentQuestion.correctAnswer;
-
-      // Always stop timer when answer submitted
-      gameManager.stopTimer();
-
-      if (isCorrect) {
-        // Calculation
-        let points = DIFFICULTIES[gameState.currentDifficulty].points;
-
-        // Handling Steal/Pass Points:
-        // If it was a pass (activePlayer != currentTurn), maybe half points?
-        // Requirement says: "Question passes to opponent". Doesn't specify point reduction.
-        // We will halve points if it is a steal/pass answer.
-
-        const isSteal = socket.id !== gameState.currentTurn;
-        if (isSteal) {
-          points = Math.floor(points / 2);
-        } else {
-          if (gameState.pendingJokers.double) points *= 2;
-        }
-
-        gameState.players[socket.id].score += points;
-
-        io.to(gameManager.roomId).emit('answerResult', {
-          playerId: socket.id,
-          playerName: gameState.players[socket.id].name,
-          correct: true,
-          points,
-          newScore: gameState.players[socket.id].score
-        });
-
-        // Point Theft Joker Logic support (if we keep it)
-        // gameState.lastEarnedPoints = { playerId: socket.id, points: points };
-
-        gameManager.endQuestion(true);
-
-      } else {
-        // WRONG Answer
-        io.to(gameManager.roomId).emit('answerResult', {
-          playerId: socket.id,
-          playerName: gameState.players[socket.id].name,
-          correct: false
-        });
-
-        // Add to attempts
-        gameState.attemptsForQuestion.push(socket.id);
-
-        // Pass to next player
-        gameManager.passTurnOrEnd();
-      }
-    });
-
-
-
-    socket.on('disconnect', () => {
-      // We need to find which game the socket was in.
-      // socket.data.roomId should have it.
-      const roomId = socket.data.roomId;
-      if (roomId && games.has(roomId)) {
-        const gameManager = games.get(roomId);
-        console.log(`Disconnected: ${socket.id} from ${roomId}`);
-
-        const result = gameManager.handlePlayerDisconnect(socket.id);
-
-        if (result) {
-          io.to(roomId).emit('playerDisconnected', {
-            message: `${result.name} ayrıldı`,
-            players: gameManager.getPlayersData()
-          });
-
-          if (result.wasTurn && gameManager.gameState.gameStarted) {
-            gameManager.stopTimer();
-            gameManager.nextTurn();
-          }
-
-          // Clean up empty rooms
-          if (Object.keys(gameManager.gameState.players).length === 0) {
-            console.log(`Deleting empty room ${roomId}`);
-            games.delete(roomId);
-          }
-        }
-      }
-    });
-
+      // Pass to next player
+      gameManager.passTurnOrEnd();
+    }
   });
 
-  const PORT = process.env.PORT || 3000;
-  http.listen(PORT, () => {
-    console.log(`🎮 Trivia Server running on port ${PORT}`);
+
+
+  socket.on('disconnect', () => {
+    // We need to find which game the socket was in.
+    // socket.data.roomId should have it.
+    const roomId = socket.data.roomId;
+    if (roomId && games.has(roomId)) {
+      const gameManager = games.get(roomId);
+      console.log(`Disconnected: ${socket.id} from ${roomId}`);
+
+      const result = gameManager.handlePlayerDisconnect(socket.id);
+
+      if (result) {
+        io.to(roomId).emit('playerDisconnected', {
+          message: `${result.name} ayrıldı`,
+          players: gameManager.getPlayersData()
+        });
+
+        if (result.wasTurn && gameManager.gameState.gameStarted) {
+          gameManager.stopTimer();
+          gameManager.nextTurn();
+        }
+
+        // Clean up empty rooms
+        if (Object.keys(gameManager.gameState.players).length === 0) {
+          console.log(`Deleting empty room ${roomId}`);
+          games.delete(roomId);
+        }
+      }
+    }
   });
+
+});
+
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => {
+  console.log(`🎮 Trivia Server running on port ${PORT}`);
+});
