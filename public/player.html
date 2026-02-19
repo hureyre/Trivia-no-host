@@ -263,7 +263,7 @@
             if (!name) return showToast('Lütfen isim girin', 'error');
 
             playerName = name;
-            localStorage.setItem('trivia_player_name', name);
+            sessionStorage.setItem('trivia_player_name', name);
             document.getElementById('welcomeName').textContent = name;
             showScreen('roomSelectionScreen');
         });
@@ -353,6 +353,7 @@
         // --- Game Flow ---
 
         document.getElementById('startGameBtn').addEventListener('click', () => {
+            console.log('Start Game button clicked, emitting event');
             socket.emit('startGame');
         });
 
