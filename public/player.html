@@ -218,6 +218,10 @@
                         <div class="joker-icon">⏱️</div>
                         <div class="joker-name">Ek Süre</div>
                     </button>
+                    <button class="joker-btn" id="jokerSteal" data-joker="steal">
+                        <div class="joker-icon">🕵️</div>
+                        <div class="joker-name">Puan Çal</div>
+                    </button>
                 </div>
             </div>
 
@@ -513,6 +517,12 @@
                 </div>
             `).join('');
 
+            // Sync personal score display
+            const currentPlayer = players.find(p => p.id === playerId);
+            if (currentPlayer) {
+                document.getElementById('playerScore').textContent = currentPlayer.score;
+            }
+
             // Allow update of dashboard list if active
             if (document.getElementById('playersListContainer')) {
                 document.getElementById('playersListContainer').innerHTML = players.map(p => `
@@ -559,11 +569,12 @@
                 d.className = 'category-group';
                 d.innerHTML = `<h4>${cat}</h4>`;
                 // Add buttons for difficulty
+                const diffMapping = { 'easy': 'KOLAY', 'medium': 'ORTA', 'hard': 'ZOR' };
                 ['easy', 'medium', 'hard'].forEach(diff => {
                     const btn = document.createElement('button');
                     btn.className = 'difficulty-btn-mini ' + diff;
                     const points = diff === 'easy' ? 10 : (diff === 'medium' ? 20 : 30);
-                    btn.textContent = `${diff.toUpperCase()} (${points}p)`;
+                    btn.textContent = `${diffMapping[diff]} (${points}p)`;
                     btn.onclick = () => socket.emit('selectQuestion', { category: cat, difficulty: diff });
                     d.appendChild(btn);
                 });
@@ -574,6 +585,7 @@
             // Update disable state
             if (!jokers.double) document.getElementById('jokerDouble').disabled = true;
             if (!jokers.extraTime) document.getElementById('jokerExtraTime').disabled = true;
+            if (!jokers.steal) document.getElementById('jokerSteal').disabled = true;
         }
 
     </script>

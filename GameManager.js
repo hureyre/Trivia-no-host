@@ -54,7 +54,8 @@ class GameManager {
             questionsAsMainPlayer: savedSession ? savedSession.questionsAsMainPlayer : 0,
             jokers: savedSession ? savedSession.jokers : {
                 double: true,
-                extraTime: true
+                extraTime: true,
+                steal: true
             },
             isActive: false
         };
@@ -352,6 +353,39 @@ class GameManager {
 
         if (jokerType === 'double') this.gameState.pendingJokers.double = true;
         if (jokerType === 'extraTime') this.gameState.pendingJokers.extraTime = true;
+
+        if (jokerType === 'steal') {
+            // Logic: Steal 20 points from the leader (excluding self)
+            const playerIds = Object.keys(this.gameState.players);
+            if (playerIds.length < 2) return false;
+
+            let leaderId = null;
+            let maxScore = -1;
+
+            playerIds.forEach(id => {
+                if (id !== socketId) {
+                    const pScore = this.gameState.players[id].score;
+                    if (pScore > maxScore) {
+                        maxScore = pScore;
+                        leaderId = id;
+                    }
+                }
+            });
+
+            if (leaderId && maxScore > 0) {
+                const stolenPoints = Math.min(20, maxScore);
+                this.gameState.players[leaderId].score -= stolenPoints;
+                this.gameState.players[socketId].score += stolenPoints;
+                this.gameState.lastSteal = {
+                    from: this.gameState.players[leaderId].name,
+                    to: this.gameState.players[socketId].name,
+                    points: stolenPoints
+                };
+            } else {
+                // If everyone else has 0 or no leader, joker is used but nothing stolen (or return false?)
+                // Let's allow use but nothing happens if no points to steal.
+            }
+        }
 
         return true;
     }

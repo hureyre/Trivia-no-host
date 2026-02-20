@@ -81,7 +81,8 @@ io.on('connection', (socket) => {
             currentPlayerId: gameManager.gameState.currentTurn,
             currentPlayerName: gameManager.gameState.players[gameManager.gameState.currentTurn].name
           });
-          // Sync active question if any
+
+          // Sync active question or turn
           if (gameManager.gameState.currentQuestion) {
             socket.emit('questionSelected', {
               question: gameManager.gameState.currentQuestion,
@@ -89,6 +90,11 @@ io.on('connection', (socket) => {
               points: DIFFICULTIES[gameManager.gameState.currentDifficulty].points,
               category: gameManager.gameState.currentCategory,
               difficulty: gameManager.gameState.currentDifficulty
+            });
+          } else if (socket.id === gameManager.gameState.currentTurn) {
+            socket.emit('yourTurn', {
+              message: 'Sıra sende! Kategori seç.',
+              availableJokers: gameManager.gameState.players[socket.id].jokers
             });
           }
         } else {
@@ -254,6 +260,21 @@ io.on('connection', (socket) => {
           const extendedTime = DIFFICULTIES[difficulty].time * 2;
           gameManager.startQuestionTimer(extendedTime);
         }
+      } else if (jokerType === 'steal') {
+        const stealData = gameState.lastSteal;
+        io.to(gameManager.roomId).emit('jokerUsed', {
+          playerId: socket.id,
+          playerName: gameState.players[socket.id].name,
+          jokerType: 'Puan Hırsızı',
+          message: `${stealData.from} adlı oyuncudan ${stealData.points} puan çalındı!`
+        });
+
+        // Sync scoreboard for everyone
+        io.to(gameManager.roomId).emit('playerListUpdate', {
+          players: gameManager.getPlayersData(),
+          totalPlayers: Object.keys(gameManager.gameState.players).length,
+          gameStarted: true
+        });
       }
       socket.emit('jokerActivated', { jokerType });
     } else {
