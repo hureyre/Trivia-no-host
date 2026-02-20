@@ -5,7 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e94560">
     <title>Trivia Yarışması</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -248,6 +252,11 @@
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
         const socket = io();
         let playerId = null;
         let playerName = null;
@@ -492,7 +501,7 @@
             document.getElementById('answerButtons').style.display = 'none';
             document.getElementById('passNotification').style.display = 'none';
             // Also reset category selection visibility based on turn
-            if (isMyTurn) document.getElementById('categorySelection').style.display = 'block';
+            document.getElementById('categorySelection').style.display = isMyTurn ? 'block' : 'none';
         }
 
         function updateTurnUI(currentId, currentName) {
