@@ -374,6 +374,13 @@ io.on('connection', (socket) => {
         newScore: gameState.players[socket.id].score
       });
 
+      // Update scoreboard for everyone
+      io.to(gameManager.roomId).emit('playerListUpdate', {
+        players: gameManager.getPlayersData(),
+        totalPlayers: Object.keys(gameManager.gameState.players).length,
+        gameStarted: true
+      });
+
       // Point Theft Joker Logic support (if we keep it)
       // gameState.lastEarnedPoints = { playerId: socket.id, points: points };
 

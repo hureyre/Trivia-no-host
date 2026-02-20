@@ -347,6 +347,8 @@
             updatePlayerList(data.players, data.totalPlayers);
             if (data.totalPlayers >= 2 && !data.gameStarted) {
                 document.getElementById('startGameBtn').style.display = 'block';
+            } else {
+                document.getElementById('startGameBtn').style.display = 'none';
             }
         });
 
@@ -560,7 +562,8 @@
                 ['easy', 'medium', 'hard'].forEach(diff => {
                     const btn = document.createElement('button');
                     btn.className = 'difficulty-btn-mini ' + diff;
-                    btn.textContent = diff.toUpperCase();
+                    const points = diff === 'easy' ? 10 : (diff === 'medium' ? 20 : 30);
+                    btn.textContent = `${diff.toUpperCase()} (${points}p)`;
                     btn.onclick = () => socket.emit('selectQuestion', { category: cat, difficulty: diff });
                     d.appendChild(btn);
                 });

@@ -144,6 +144,7 @@ class GameManager {
             totalPlayers: Object.keys(this.gameState.players).length,
             gameStarted: this.gameState.gameStarted
         });
+        this.nextTurn();
         return true;
     }
 
