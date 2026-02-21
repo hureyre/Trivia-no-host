@@ -1,6 +1,6 @@
 const CACHE_NAME = 'trivia-v1';
 const ASSETS = [
-    '/player.html',
+    '/index.html',
     '/style.css',
     '/socket.io/socket.io.js'
 ];

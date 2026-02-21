@@ -10,7 +10,7 @@ app.use(express.static('public'));
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'player.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Game Rooms Map
