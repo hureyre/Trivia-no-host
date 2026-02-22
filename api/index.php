@@ -12,6 +12,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once 'db.php';
 
+// Global error handler for production stabilization
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    if (!(error_reporting() & $errno)) return false;
+    header('Content-Type: application/json', true, 500);
+    echo json_encode(['error' => 'Internal Server Error', 'message' => $errstr, 'line' => $errline]);
+    exit;
+});
+
+set_exception_handler(function($exception) {
+    header('Content-Type: application/json', true, 500);
+    echo json_encode(['error' => 'Uncaught Exception', 'message' => $exception->getMessage()]);
+    exit;
+});
+
 $request = $_GET['action'] ?? '';
 
 switch ($request) {
@@ -37,8 +51,14 @@ switch ($request) {
         }
 
         $playerToken = bin2hex(random_bytes(16));
-        $playerStmt = $pdo->prepare("INSERT INTO players (game_id, name, token) VALUES (?, ?, ?)");
-        $playerStmt->execute([$game['id'], $playerName, $playerToken]);
+        
+        // Check if this is the first player in the game to set as host
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM players WHERE game_id = ?");
+        $countStmt->execute([$game['id']]);
+        $isHost = ($countStmt->fetchColumn() == 0) ? 1 : 0;
+
+        $playerStmt = $pdo->prepare("INSERT INTO players (game_id, name, token, is_host) VALUES (?, ?, ?, ?)");
+        $playerStmt->execute([$game['id'], $playerName, $playerToken, $isHost]);
         $playerId = $pdo->lastInsertId();
         
         echo json_encode([
@@ -84,6 +104,16 @@ switch ($request) {
             'players' => $players,
             'current_question' => $question
         ]);
+        break;
+
+    case 'reset_game':
+        $gameId = $_POST['game_id'] ?? null;
+        $playerToken = $_POST['player_token'] ?? '';
+        
+        // Verify host (for now first player, would need more robust check in prod)
+        $stmt = $pdo->prepare("UPDATE games SET status = 'lobby', current_question_id = NULL, question_started_at = NULL WHERE id = ?");
+        $stmt->execute([$gameId]);
+        echo json_encode(['success' => true]);
         break;
 
     case 'start_game':

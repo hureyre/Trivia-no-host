@@ -1,6 +1,6 @@
 // frontend/src/lib/api.ts
 
-const API_BASE_URL = 'http://localhost/Trivia-no-host/api/index.php'; // Adjust based on your local server setup
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost/Trivia-no-host/api/index.php';
 
 export async function apiCall(action: string, params: Record<string, any> = {}, method: 'GET' | 'POST' = 'GET') {
     const url = new URL(API_BASE_URL);

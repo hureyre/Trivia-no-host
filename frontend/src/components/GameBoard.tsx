@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiCall } from '@/lib/api';
+import AdminPanel from './AdminPanel';
 
 interface Question {
     id: number;
@@ -80,9 +81,22 @@ export default function GameBoard({ gameId, roomCode, playerToken, playerId }: G
     if (!gameState) return <div className="text-center p-10">Yükleniyor...</div>;
 
     const { game, players, current_question } = gameState;
+    const currentPlayer = players.find((p: any) => p.id === playerId);
+    const isHost = currentPlayer?.is_host === 1;
 
     return (
         <div className="max-w-4xl mx-auto p-4 space-y-8">
+            {isHost && (
+                <AdminPanel
+                    gameId={gameId}
+                    playerToken={playerToken}
+                    isHost={isHost}
+                    onReset={() => {
+                        setSelectedOption(null);
+                        setResult(null);
+                    }}
+                />
+            )}
             <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div className="space-y-1">
                     <div className="text-sm text-gray-400 font-medium uppercase tracking-wider">Oda Kodu</div>
@@ -169,7 +183,7 @@ export default function GameBoard({ gameId, roomCode, playerToken, playerId }: G
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {categories.map(cat => (
+                        {categories.map((cat: { id: number; name: string }) => (
                             <div key={cat.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-3">
                                 <div className="font-bold text-gray-700 text-sm">{cat.name}</div>
                                 <div className="flex flex-col space-y-2">
