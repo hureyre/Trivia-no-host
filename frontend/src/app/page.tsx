@@ -51,7 +51,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4">
+    <main className="min-h-screen bg-transparent py-4 px-2 md:py-12 md:px-4">
       {gameState === 'lobby' ? (
         <Lobby onCreate={handleCreateRoom} onJoin={handleJoinRoom} />
       ) : (

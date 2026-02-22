@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import { apiCall } from '@/lib/api';
 
 interface AdminPanelProps {
@@ -19,24 +20,32 @@ export default function AdminPanel({ gameId, playerToken, isHost, onReset }: Adm
                 await apiCall('reset_game', { game_id: gameId, player_token: playerToken }, 'POST');
                 onReset();
             } catch (err) {
-                alert('Sıfırlama hatası!');
+                console.error(err);
             }
         }
     };
 
     return (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
-            <div className="flex items-center space-x-2 text-amber-800 font-bold">
-                <span>🛠️ Host Paneli</span>
+        <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-slate-900/80 border border-amber-500/20 p-4 rounded-3xl flex items-center justify-between backdrop-blur-md"
+        >
+            <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 text-sm">
+                    🛠️
+                </div>
+                <span className="text-amber-500/80 font-black text-xs uppercase tracking-widest">HOST PANELİ</span>
             </div>
-            <div className="flex space-x-2">
-                <button
-                    onClick={handleReset}
-                    className="px-4 py-2 bg-amber-600 text-white text-xs font-black uppercase rounded-lg hover:bg-amber-700 transition-colors shadow-sm"
-                >
-                    OYUNU SIFIRLA
-                </button>
-            </div>
-        </div>
+
+            <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleReset}
+                className="px-6 py-2 bg-amber-600/10 border border-amber-600 text-amber-500 text-[10px] font-black uppercase rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-lg shadow-amber-900/20"
+            >
+                OYUNU SIFIRLA
+            </motion.button>
+        </motion.div>
     );
 }
