@@ -1,44 +1,51 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --arena-card: #1e293b;
-    --arena-neon-green: #22c55e;
-    --arena-neon-purple: #a855f7;
-    --arena-neon-red: #ef4444;
-    --arena-neon-blue: #3b82f6;
-  }
+@theme {
+  --color-arena-bg: #0f172a;
+  --color-arena-card: #1e293b;
+  --color-neon-green: #22c55e;
+  --color-neon-purple: #a855f7;
+  --color-neon-red: #ef4444;
+  --color-neon-blue: #3b82f6;
 
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui;
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui;
+}
+
+@layer base {
+
+  html,
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: #0f172a !important;
+    color: #f8fafc;
     min-height: 100vh;
-    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
   }
 }
 
-@layer utilities {
-  .neon-glow-green {
-    box-shadow: 0 0 15px -2px var(--arena-neon-green);
-    border-color: var(--arena-neon-green);
-  }
-  .neon-glow-purple {
-    box-shadow: 0 0 15px -2px var(--arena-neon-purple);
-    border-color: var(--arena-neon-purple);
-  }
-  .neon-glow-red {
-    box-shadow: 0 0 15px -2px var(--arena-neon-red);
-    border-color: var(--arena-neon-red);
-  }
-  .neon-glow-blue {
-    box-shadow: 0 0 15px -2px var(--arena-neon-blue);
-    border-color: var(--arena-neon-blue);
-  }
-  .arena-card {
-    background: var(--arena-card);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-  }
+@utility neon-glow-green {
+  box-shadow: 0 0 15px -2px #22c55e;
+  border-color: #22c55e;
+}
+
+@utility neon-glow-purple {
+  box-shadow: 0 0 15px -2px #a855f7;
+  border-color: #a855f7;
+}
+
+@utility neon-glow-red {
+  box-shadow: 0 0 15px -2px #ef4444;
+  border-color: #ef4444;
+}
+
+@utility neon-glow-blue {
+  box-shadow: 0 0 15px -2px #3b82f6;
+  border-color: #3b82f6;
+}
+
+@utility arena-card {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
 }
